@@ -1,5 +1,5 @@
-// Einstellungen, die der Nutzer in der Oberfläche ändern kann. Sie liegen als `settings.json` im selben Ordner wie
-// der Schlüssel (siehe `identity::key_path`), also bei der portablen Version neben der .exe.
+// Settings the user can change in the interface. They are stored as `settings.json` in the same folder as
+// the key (see `identity::key_path`), i.e. next to the exe in the portable version.
 use crate::config;
 use crate::identity;
 use anyhow::Result;
@@ -7,30 +7,30 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
-/// Ein Gerät, dem der Nutzer dauerhaft vertraut ("Immer erlauben").
+/// A device the user trusts permanently ("Always allow").
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct Trusted {
     pub id: String,
     pub name: String,
 }
 
-// `#[serde(default)]`: fehlt ein Feld in der Datei (z. B. nach einem Update), gilt der Standardwert.
+// `#[serde(default)]`: if a field is missing in the file (e.g. after an update), the default value applies.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 #[serde(default)]
 pub struct Settings {
-    /// Name, unter dem AirBridge auf dem iPhone erscheint.
+    /// Name under which AirBridge appears on the iPhone.
     pub name: String,
-    /// Mit Windows starten (startet versteckt im Tray).
+    /// Start with Windows (starts hidden in the tray).
     pub autostart: bool,
-    /// Beim Schließen des Fensters im Tray weiterlaufen statt zu beenden.
+    /// Keep running in the tray when the window is closed instead of quitting.
     pub minimize_to_tray: bool,
-    /// Fenster immer im Vordergrund.
+    /// Keep the window on top.
     pub always_on_top: bool,
-    /// Sobald ein iPhone spiegelt, automatisch in den Vollbildmodus wechseln.
+    /// Switch to fullscreen automatically as soon as an iPhone mirrors.
     pub start_fullscreen: bool,
-    /// Vor jeder neuen Verbindung nachfragen.
+    /// Ask before every new connection.
     pub require_confirm: bool,
-    /// Unbekannte Geräte still ablehnen (ohne Dialog); nur vertraute Geräte dürfen spiegeln.
+    /// Reject unknown devices silently (no dialog); only trusted devices may mirror.
     pub trusted_only: bool,
     pub trusted: Vec<Trusted>,
 }
@@ -51,7 +51,7 @@ impl Default for Settings {
 }
 
 impl Settings {
-    /// Macht aus der Eingabe einen brauchbaren Gerätenamen (keine Steuerzeichen, höchstens 40 Zeichen, nie leer).
+    /// Turns the input into a usable device name (no control characters, at most 40 characters, never empty).
     pub fn clean_name(raw: &str) -> String {
         let name: String = raw
             .chars()
@@ -77,7 +77,7 @@ pub fn path() -> PathBuf {
     identity::key_path().with_file_name("settings.json")
 }
 
-/// Lädt die Einstellungen; fehlt die Datei oder ist sie kaputt, gelten die Standardwerte.
+/// Loads the settings; if the file is missing or broken, the defaults apply.
 pub fn load() -> Settings {
     fs::read_to_string(path())
         .ok()

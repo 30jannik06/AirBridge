@@ -1,14 +1,14 @@
-// Minimaler NTP-Client für AirPlay. Bei AirPlay ist der RECEIVER der Fragende:
-// Er schickt regelmäßig 32-Byte-Anfragen an den "timingPort" des iPhones.
-// Bleiben die Anfragen aus, bricht iOS die Verbindung gerne ab.
-// Die Antworten werten wir noch nicht aus (Audio-/Video-Sync kommt später).
+// Minimal NTP client for AirPlay. In AirPlay the RECEIVER is the one asking:
+// it regularly sends 32-byte requests to the iPhone's "timingPort".
+// If the requests stop, iOS tends to drop the connection.
+// We do not evaluate the replies yet (audio/video sync is on the roadmap).
 use std::net::{SocketAddr, UdpSocket};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-/// NTP-Zeit: 32 Bit Sekunden seit 1900 + 32 Bit Bruchteil, big endian.
+/// NTP time: 32 bits of seconds since 1900 + 32 bits of fraction, big endian.
 fn ntp_now() -> [u8; 8] {
     let d = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -43,7 +43,7 @@ pub fn start(socket: UdpSocket, remote: SocketAddr, stop: Arc<AtomicBool>) {
                     }
                 }
             }
-            // Anfangs viermal pro Sekunde, danach alle 3 Sekunden.
+            // Four times per second at first, then every 3 seconds.
             let pause_ms = if sent > 30 { 3000 } else { 250 };
             for _ in 0..(pause_ms / 50) {
                 if stop.load(Ordering::Relaxed) {

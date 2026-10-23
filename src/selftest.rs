@@ -1,5 +1,5 @@
-// Offline-Test des Decoders: `airbridge --decode-file mirror_dump.h264 300 out.ppm`
-// dekodiert eine Annex-B-Datei und speichert das n-te Bild als PPM. Hilft beim Debuggen ohne iPhone.
+// Offline test of the decoder: `airbridge --decode-file mirror_dump.h264 300 out.ppm`
+// decodes an Annex B file and saves the n-th picture as PPM. Helps debugging without an iPhone.
 use crate::decoder::H264Decoder;
 use anyhow::{Result, bail};
 use std::fs;
@@ -8,22 +8,22 @@ pub fn decode_file(path: &str, wanted: usize, out: &str) -> Result<()> {
     let data = fs::read(path)?;
     let mut dec = H264Decoder::new()?;
 
-    // Startcodes (00 00 00 01) finden, damit wir die Datei in NAL-Einheiten zerlegen können.
+    // Find start codes (00 00 00 01) so we can split the file into NAL units.
     let starts: Vec<usize> = (0..data.len().saturating_sub(3))
         .filter(|&i| data[i..i + 4] == [0, 0, 0, 1])
         .collect();
 
-    let mut pending: Vec<u8> = Vec::new(); // SPS/PPS/SEI sammeln, bis die Bild-NAL kommt
+    let mut pending: Vec<u8> = Vec::new(); // collect SPS/PPS/SEI until the picture NAL arrives
     let mut count = 0usize;
     let mut pictures = 0usize;
-    let mut fixed_stream: Vec<u8> = Vec::new(); // Stream mit umgeschriebenem SPS, für ffmpeg-Kontrolle
+    let mut fixed_stream: Vec<u8> = Vec::new(); // stream with rewritten SPS, for checking with ffmpeg
     let mut saved = false;
     for (k, &s) in starts.iter().enumerate() {
         let end = starts.get(k + 1).copied().unwrap_or(data.len());
         let nal = &data[s..end];
         let nal_type = nal[4] & 0x1f;
         if nal_type == 7 && std::env::var("AB_RAW_SPS").is_err() {
-            // SPS umschreiben wie im Live-Betrieb (mit AB_RAW_SPS=1 abschaltbar, zum Vergleichen).
+            // Rewrite the SPS like in live operation (can be switched off with AB_RAW_SPS=1, for comparison).
             let fixed = crate::sps::low_latency(&nal[4..])
                 .ok_or_else(|| anyhow::anyhow!("SPS nicht lesbar"))?;
             println!(
@@ -60,7 +60,7 @@ pub fn decode_file(path: &str, wanted: usize, out: &str) -> Result<()> {
         }
     }
     if std::env::var("AB_WRITE_FIXED").is_ok() {
-        fs::write("fixed_sps.h264", &fixed_stream)?; // zum Gegenprüfen mit ffmpeg/ffprobe
+        fs::write("fixed_sps.h264", &fixed_stream)?; // for cross-checking with ffmpeg/ffprobe
     }
     println!(
         "{count} Frames dekodiert (ohne Flush), {} Pakete insgesamt",

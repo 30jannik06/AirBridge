@@ -1,14 +1,14 @@
-// Schreibt den H.264-SPS so um, dass der Decoder KEINE Bilder zur Umsortierung zurückhält.
+// Rewrites the H.264 SPS so the decoder does NOT hold back pictures for reordering.
 //
-// Hintergrund: Ohne die VUI-Angabe `max_num_reorder_frames` nimmt der Windows-Decoder den schlimmsten Fall
-// an und hält bis zu `max_num_ref_frames` Bilder zurück, bevor er eines ausgibt. Das ist spürbare Verzögerung.
-// Der iPhone-Stream hat keine B-Frames, also tragen wir `num_reorder_frames = 0` ein.
+// Background: without the VUI field `max_num_reorder_frames` the Windows decoder assumes the worst case
+// and holds back up to `max_num_ref_frames` pictures before it outputs one. That is noticeable delay.
+// The iPhone stream has no B-frames, so we write `num_reorder_frames = 0`.
 //
-// H.264 speichert Zahlen als "Exp-Golomb"-Code (ue/se): kleine Zahlen brauchen wenige Bits.
+// H.264 stores numbers as "Exp-Golomb" codes (ue/se): small numbers need few bits.
 
 struct BitReader<'a> {
     data: &'a [u8],
-    pos: usize, // Position in Bits
+    pos: usize, // position in bits
 }
 
 impl BitReader<'_> {
@@ -67,7 +67,7 @@ impl BitWriter {
     }
     fn ue(&mut self, v: u32) {
         let x = v + 1;
-        let len = 32 - x.leading_zeros(); // Anzahl Bits von x
+        let len = 32 - x.leading_zeros(); // number of bits in x
         for _ in 0..len - 1 {
             self.bit(0);
         }
@@ -77,7 +77,7 @@ impl BitWriter {
     }
 }
 
-/// Entfernt die "Emulation Prevention"-Bytes (00 00 03 -> 00 00).
+/// Removes the "emulation prevention" bytes (00 00 03 -> 00 00).
 fn unescape(nal: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(nal.len());
     let mut zeros = 0;
@@ -92,7 +92,7 @@ fn unescape(nal: &[u8]) -> Vec<u8> {
     out
 }
 
-/// Fügt Emulation-Prevention-Bytes wieder ein: nach 00 00 darf kein Byte <= 3 folgen.
+/// Re-inserts emulation prevention bytes: after 00 00 no byte <= 3 may follow.
 fn escape(rbsp: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(rbsp.len() + 4);
     let mut zeros = 0;
@@ -126,11 +126,11 @@ fn skip_hrd(r: &mut BitReader) -> Option<()> {
         r.ue()?;
         r.bit()?;
     }
-    r.skip(20) // 4 x 5 Bit Längenangaben
+    r.skip(20) // 4 x 5 bit length fields
 }
 
-/// Nimmt einen SPS (NAL-Einheit OHNE Startcode, inkl. Header-Byte) und liefert eine Variante mit
-/// `num_reorder_frames = 0`. `None`, wenn der SPS nicht gelesen werden konnte (dann Original verwenden).
+/// Takes an SPS (NAL unit WITHOUT start code, including the header byte) and returns a variant with
+/// `num_reorder_frames = 0`. `None` if the SPS could not be read (then use the original).
 pub fn low_latency(nal: &[u8]) -> Option<Vec<u8>> {
     if nal.len() < 5 || nal[0] & 0x1f != 7 {
         return None;
@@ -189,7 +189,7 @@ pub fn low_latency(nal: &[u8]) -> Option<Vec<u8>> {
         }
     }
 
-    // Ab hier VUI. `restriction_pos` = Bitposition, ab der wir alles neu schreiben.
+    // From here on VUI. `restriction_pos` = bit position from which we rewrite everything.
     let restriction_pos;
     let vui_pos = r.pos;
     let mut add_empty_vui = false;
@@ -229,13 +229,13 @@ pub fn low_latency(nal: &[u8]) -> Option<Vec<u8>> {
             r.bit()?; // low_delay_hrd_flag
         }
         r.bit()?; // pic_struct_present_flag
-        restriction_pos = r.pos; // hier steht bitstream_restriction_flag
+        restriction_pos = r.pos; // bitstream_restriction_flag is here
     } else {
         restriction_pos = vui_pos;
         add_empty_vui = true;
     }
 
-    // Neu aufbauen: alles bis restriction_pos kopieren, dann unsere Angaben, dann Abschlussbits.
+    // Rebuild: copy everything up to restriction_pos, then our values, then the closing bits.
     let mut src = BitReader {
         data: &rbsp,
         pos: 0,
@@ -247,7 +247,7 @@ pub fn low_latency(nal: &[u8]) -> Option<Vec<u8>> {
     if add_empty_vui {
         w.bit(1); // vui_parameters_present_flag
         for _ in 0..8 {
-            w.bit(0); // aspect, overscan, video_signal, chroma_loc, timing, nal_hrd, vcl_hrd, pic_struct: alle nicht vorhanden
+            w.bit(0); // aspect, overscan, video_signal, chroma_loc, timing, nal_hrd, vcl_hrd, pic_struct: all absent
         }
     }
     w.bit(1); // bitstream_restriction_flag
@@ -256,7 +256,7 @@ pub fn low_latency(nal: &[u8]) -> Option<Vec<u8>> {
     w.ue(1); // max_bits_per_mb_denom
     w.ue(16); // log2_max_mv_length_horizontal
     w.ue(16); // log2_max_mv_length_vertical
-    w.ue(0); // max_num_reorder_frames = 0  <-- der entscheidende Wert
+    w.ue(0); // max_num_reorder_frames = 0  <-- the decisive value
     w.ue(max_num_ref_frames.max(1)); // max_dec_frame_buffering
     w.bit(1); // rbsp_stop_one_bit
     while w.nbits % 8 != 0 {
@@ -272,7 +272,7 @@ pub fn low_latency(nal: &[u8]) -> Option<Vec<u8>> {
 mod tests {
     use super::*;
 
-    /// Echter SPS eines iPhones (High Profile, Level 3.1, VUI ohne bitstream_restriction).
+    /// A real SPS from an iPhone (High Profile, Level 3.1, VUI without bitstream_restriction).
     const IPHONE_SPS: [u8; 18] = [
         0x27, 0x64, 0x00, 0x1f, 0xac, 0x13, 0x14, 0x50, 0x20, 0x02, 0x27, 0x88, 0x96, 0x6e, 0x02,
         0x1a, 0x02, 0x04,
@@ -293,7 +293,7 @@ mod tests {
 
     #[test]
     fn signed_exp_golomb() {
-        // se(v): 0, 1, -1, 2, -2 werden als ue 0, 1, 2, 3, 4 gespeichert
+        // se(v): 0, 1, -1, 2, -2 are stored as ue 0, 1, 2, 3, 4
         for (coded, expected) in [(0u32, 0i32), (1, 1), (2, -1), (3, 2), (4, -2)] {
             let mut w = BitWriter::default();
             w.ue(coded);
@@ -309,7 +309,7 @@ mod tests {
     fn emulation_prevention_roundtrip() {
         let raw = [0u8, 0, 1, 0, 0, 0, 0, 3, 0, 0, 2, 7];
         assert_eq!(unescape(&escape(&raw)), raw);
-        // 00 00 01 darf im Strom nicht vorkommen, also muss ein 03 eingefügt werden
+        // 00 00 01 must not occur in the stream, so a 03 has to be inserted
         assert_eq!(escape(&[0, 0, 1]), [0, 0, 3, 1]);
     }
 

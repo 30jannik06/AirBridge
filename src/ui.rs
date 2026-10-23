@@ -1,5 +1,5 @@
-// Oberfläche (egui): links ein Panel mit Status, Einstellungen und Log, in der Mitte das iPhone-Bild.
-// Sobald ein iPhone spiegelt, wird das Panel ausgeblendet und das Bild füllt das Fenster.
+// Interface (egui): a panel with status, settings and log on the left, the iPhone picture in the middle.
+// As soon as an iPhone mirrors, the panel is hidden and the picture fills the window.
 use crate::dacp::{self, Command};
 use crate::decoder::{Latest, Update};
 use crate::settings::Settings;
@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 
 const ACCENT: Color32 = Color32::from_rgb(64, 156, 255);
 const OVERLAY_SECONDS: f32 = 2.5;
-const HOME_SIZE: [f32; 2] = [780.0, 640.0]; // Fenstergröße ohne Bild: Panel + Hinweis passen nebeneinander
+const HOME_SIZE: [f32; 2] = [780.0, 640.0]; // window size without a picture: panel and hint fit side by side
 
 #[derive(PartialEq, Clone, Copy)]
 enum Tab {
@@ -35,7 +35,7 @@ pub struct App {
     auto_fullscreen: bool,
     show_panel: bool,
     tab: Tab,
-    edit: Settings, // Arbeitskopie der Einstellungen, wird mit "Speichern" übernommen
+    edit: Settings, // working copy of the settings, applied with "Save"
     notice: Option<String>,
     tray: Option<Tray>,
     last_motion: Instant,
@@ -44,7 +44,7 @@ pub struct App {
     bars: [f32; spectrum::BANDS],
 }
 
-/// Startet die Oberfläche. Blockiert, bis das Programm beendet wird.
+/// Starts the interface. Blocks until the program ends.
 pub fn run(latest: Latest, start_hidden: bool) -> eframe::Result {
     let settings = shared::settings();
     let icon = egui::IconData {
@@ -116,7 +116,7 @@ fn style(ctx: &egui::Context) {
 }
 
 impl eframe::App for App {
-    // Läuft auch, wenn das Fenster im Tray versteckt ist: hier werden Tray-Klicks und neue Bilder verarbeitet.
+    // Also runs while the window is hidden in the tray: tray clicks and new pictures are handled here.
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         if let Some(tray) = &self.tray {
             while let Ok(action) = tray.rx.try_recv() {
@@ -167,7 +167,7 @@ impl eframe::App for App {
             None => {}
         }
 
-        // Eine Verbindungsanfrage muss sichtbar werden, auch wenn das Fenster im Tray steckt.
+        // A connection request has to become visible even if the window sits in the tray.
         if shared::with(|s| s.pending.is_some()) {
             show_window(ctx);
         }
@@ -196,7 +196,7 @@ impl eframe::App for App {
             ctx.send_viewport_cmd(ViewportCommand::Visible(false));
         }
 
-        // Tastatur
+        // Keyboard
         if ctx.input(|i| i.key_pressed(Key::F11)) {
             let on = !self.fullscreen;
             self.set_fullscreen(&ctx, on);
@@ -224,11 +224,11 @@ impl eframe::App for App {
         self.approval_dialog(&ctx);
 
         if self.connected {
-            ctx.request_repaint_after(Duration::from_millis(500)); // damit die Schaltflächen wieder verschwinden
+            ctx.request_repaint_after(Duration::from_millis(500)); // so the buttons can fade out again
         } else if shared::audio_recent() {
-            ctx.request_repaint_after(Duration::from_millis(33)); // Spektrum und Fortschritt animieren
+            ctx.request_repaint_after(Duration::from_millis(33)); // animate spectrum and progress
         } else if self.show_panel {
-            ctx.request_repaint_after(Duration::from_secs(1)); // neue Log-Zeilen und Status anzeigen
+            ctx.request_repaint_after(Duration::from_secs(1)); // show new log lines and status
         }
     }
 }
@@ -245,7 +245,7 @@ impl App {
         ctx.send_viewport_cmd(ViewportCommand::Fullscreen(on));
     }
 
-    /// Passt die Fenstergröße an das Bild an (1 Bildpixel = 1 Bildschirmpixel, nur bei Bedarf verkleinert).
+    /// Fits the window to the picture (1 picture pixel = 1 screen pixel, scaled down only if needed).
     fn fit_window(&mut self, ctx: &egui::Context) {
         let ppp = ctx.pixels_per_point();
         let (w, h) = (
@@ -281,7 +281,7 @@ impl App {
             return;
         }
 
-        // Musik statt Bild: "Läuft gerade"-Ansicht.
+        // Music instead of a picture: the "now playing" view.
         if shared::audio_recent() || shared::with(|s| s.music.has_track()) {
             ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
                 self.player(ui, rect)
@@ -289,7 +289,7 @@ impl App {
             return;
         }
 
-        // Noch kein Bild: Hinweis, wie man verbindet.
+        // No picture yet: hint on how to connect.
         ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
             ui.vertical_centered(|ui| {
                 ui.add_space(rect.height() * 0.32);
@@ -312,7 +312,7 @@ impl App {
         });
     }
 
-    /// Kleine Schaltflächen oben rechts, solange das Bild läuft und die Maus sich bewegt hat.
+    /// Small buttons in the top right while the picture runs and the mouse has moved.
     fn overlay(&mut self, ctx: &egui::Context) {
         if !self.connected || self.last_motion.elapsed().as_secs_f32() > OVERLAY_SECONDS {
             return;
@@ -618,7 +618,7 @@ fn log_tab(ui: &mut egui::Ui) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// Musik-Ansicht ("Läuft gerade")
+// Music view ("now playing")
 // ---------------------------------------------------------------------------------------------------------------
 
 #[derive(Clone, Copy, PartialEq)]
@@ -630,7 +630,7 @@ enum Icon {
 }
 
 impl App {
-    /// Lädt das Cover neu, wenn das iPhone ein neues geschickt hat (oder verwirft es am Ende der Wiedergabe).
+    /// Reloads the cover when the iPhone sent a new one (or drops it when playback ends).
     fn update_cover(&mut self, ctx: &egui::Context) {
         let (generation, bytes) = shared::with(|s| (s.music.cover_gen, s.music.cover.clone()));
         if generation == self.cover_gen {
@@ -657,7 +657,7 @@ impl App {
         let music = shared::with(|s| s.music.clone());
         let playing = shared::audio_recent();
 
-        // Balken: schnell nach oben, langsam nach unten
+        // Bars: fast up, slow down
         let target = if playing {
             self.target_bars()
         } else {
@@ -697,7 +697,7 @@ impl App {
             }
             ui.add_space(12.0);
 
-            // Titel
+            // Title
             let title = if music.title.is_empty() {
                 "Unbekannter Titel"
             } else {
@@ -712,7 +712,7 @@ impl App {
             }
             ui.add_space(10.0);
 
-            // Spektrum
+            // Spectrum
             let (area, _) = ui.allocate_exact_size(egui::vec2(width, 54.0), egui::Sense::hover());
             let slot = area.width() / spectrum::BANDS as f32;
             for (i, v) in self.bars.iter().enumerate() {
@@ -731,7 +731,7 @@ impl App {
             }
             ui.add_space(6.0);
 
-            // Fortschritt
+            // Progress
             if let Some((pos, dur)) = music.position_now(playing) {
                 let (r, _) = ui.allocate_exact_size(egui::vec2(width, 30.0), egui::Sense::hover());
                 let track =
@@ -761,7 +761,7 @@ impl App {
             }
             ui.add_space(4.0);
 
-            // Bedienung
+            // Controls
             let remote = music.dacp.as_ref().is_some_and(|d| d.target.is_some());
             let mut command = None;
             ui.horizontal(|ui| {
@@ -792,7 +792,7 @@ impl App {
                 );
             }
 
-            // Lautstärke (vom iPhone gesteuert)
+            // Volume (controlled by the iPhone)
             ui.add_space(6.0);
             let pct = volume_percent(music.volume_db);
             ui.label(RichText::new(format!("Lautstärke {pct} %")).weak().small());
@@ -800,7 +800,7 @@ impl App {
     }
 }
 
-/// Skala wie beim iPhone: -30 dB = ganz leise (0 %), 0 dB = voll (100 %), -144 = stumm.
+/// Same scale as on the iPhone: -30 dB = very quiet (0 %), 0 dB = full (100 %), -144 = mute.
 fn volume_percent(db: f32) -> u32 {
     if db <= -100.0 {
         0
@@ -823,7 +823,7 @@ fn decode_cover(bytes: &[u8]) -> Option<ColorImage> {
     Some(ColorImage::from_rgba_unmultiplied(size, img.as_raw()))
 }
 
-/// Runder Knopf mit selbst gezeichnetem Symbol (die eingebaute Schrift hat keine Medien-Symbole).
+/// Round button with a self-drawn symbol (the built-in font has no media symbols).
 fn icon_button(ui: &mut egui::Ui, icon: Icon, enabled: bool) -> bool {
     let (rect, response) = ui.allocate_exact_size(
         egui::vec2(52.0, 52.0),

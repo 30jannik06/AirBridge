@@ -1,9 +1,9 @@
-// Audio-Kanal (UDP): RTP-Pakete vom iPhone, verschlüsselt mit AES-128-CBC.
-// Inhalt: ALAC (AirPlay-Musik, offener Codec) oder AAC-ELD (Ton beim Bildschirmspiegeln, braucht `nonfree-audio`).
-// RTP-Header (12 Byte): Byte 1 = Payload-Typ, Byte 2-3 = Sequenznummer, 4-7 = Zeitstempel, 8-11 = SSRC.
-// Verschlüsselt sind nur volle 16-Byte-Blöcke des Payloads; ein Rest dahinter bleibt unverschlüsselt.
-// Der IV ist für JEDES Paket derselbe (der `eiv` aus SETUP 1).
-// Das iPhone schickt Pakete teils mehrfach ("redundantAudio"), darum werden Duplikate verworfen.
+// Audio channel (UDP): RTP packets from the iPhone, encrypted with AES-128-CBC.
+// Content: ALAC (AirPlay music, open codec) or AAC-ELD (sound while screen mirroring, needs `nonfree-audio`).
+// RTP header (12 bytes): byte 1 = payload type, bytes 2-3 = sequence number, 4-7 = timestamp, 8-11 = SSRC.
+// Only whole 16-byte blocks of the payload are encrypted; a remainder behind them stays unencrypted.
+// The IV is the same for EVERY packet (the `eiv` from SETUP 1).
+// The iPhone sometimes sends packets several times ("redundantAudio"), so duplicates are dropped.
 use crate::playback;
 use aes::Aes128;
 use anyhow::{Result, anyhow};
@@ -20,22 +20,22 @@ type Aes128CbcDec = cbc::Decryptor<Aes128>;
 const CODEC_ALAC: u64 = 2;
 const CODEC_AAC_ELD: u64 = 8;
 
-/// Was das iPhone beim SETUP über den Audio-Stream mitteilt.
+/// What the iPhone tells us about the audio stream during SETUP.
 #[derive(Debug, Clone, Copy)]
 pub struct AudioParams {
-    pub ct: u64, // Codec: 2 = ALAC, 4 = AAC-LC, 8 = AAC-ELD
+    pub ct: u64, // codec: 2 = ALAC, 4 = AAC-LC, 8 = AAC-ELD
     pub samples_per_frame: u64,
-    pub format: u64, // Bitmaske des Audioformats
+    pub format: u64, // bit mask of the audio format
 }
 
-/// Ein Decoder, egal für welchen Codec. Liefert 16-Bit-PCM, abwechselnd links/rechts.
+/// A decoder, whatever the codec. Delivers 16-bit PCM, alternating left/right.
 enum Codec {
     Alac(alac::Decoder),
     #[cfg(feature = "nonfree-audio")]
     Eld(fdk_aac::dec::Decoder),
 }
 
-/// Ergebnis eines dekodierten Pakets: wie viele Werte in `pcm` stehen, wie viele Kanäle, welche Abtastrate.
+/// Result of a decoded packet: how many values are in `pcm`, how many channels, which sample rate.
 struct Decoded {
     samples: usize,
     channels: usize,
@@ -46,7 +46,7 @@ impl Codec {
     fn new(params: &AudioParams) -> Result<Self> {
         match params.ct {
             CODEC_ALAC => {
-                // Gleiche Werte wie in der SDP-Zeile von AirPlay: Rahmenlänge 352, 16 Bit, 2 Kanäle, 44,1 kHz.
+                // Same values as in the AirPlay SDP line: frame length 352, 16 bit, 2 channels, 44.1 kHz.
                 let spf = if params.samples_per_frame == 0 {
                     352
                 } else {
@@ -60,7 +60,7 @@ impl Codec {
             #[cfg(feature = "nonfree-audio")]
             CODEC_AAC_ELD => {
                 use fdk_aac::dec::{Decoder, Transport};
-                // AudioSpecificConfig für AAC-ELD, 44,1 kHz, Stereo (Objekttyp 39).
+                // AudioSpecificConfig for AAC-ELD, 44.1 kHz, stereo (object type 39).
                 const ELD_44100_STEREO: [u8; 4] = [0xF8, 0xE8, 0x50, 0x00];
                 let mut decoder = Decoder::new(Transport::Raw);
                 decoder
@@ -104,7 +104,7 @@ impl Codec {
     }
 }
 
-/// Entschlüsselt ein RTP-Audio-Paket und gibt den Payload (ohne RTP-Header) zurück.
+/// Decrypts an RTP audio packet and returns the payload (without the RTP header).
 fn decrypt(key: &[u8; 16], iv: &[u8; 16], packet: &[u8]) -> Option<Vec<u8>> {
     let payload = packet.get(12..)?;
     let whole = payload.len() / 16 * 16;
@@ -135,7 +135,7 @@ pub fn start(
         params.format
     );
 
-    // Kontrollkanal: Synchronisationspakete. Wir brauchen sie (noch) nicht, lesen sie aber leer.
+    // Control channel: sync packets. We do not need them (yet), but read them empty.
     let stop_c = Arc::clone(&stop);
     thread::spawn(move || {
         let _ = control.set_read_timeout(Some(Duration::from_millis(500)));
@@ -172,14 +172,14 @@ pub fn start(
             if len < 13 {
                 continue;
             }
-            // Duplikate/Altes verwerfen: nur Pakete verarbeiten, die "neuer" sind als das zuletzt gespielte.
+            // Drop duplicates/old data: only process packets that are "newer" than the last one played.
             let seq = u16::from_be_bytes([buf[2], buf[3]]);
             if let Some(next) = next_seq {
                 let diff = seq.wrapping_sub(next) as i16;
                 if !(0..=64).contains(&diff) {
                     dropped += 1;
                     if diff.abs() > 1000 {
-                        next_seq = Some(seq); // große Sprünge: neu synchronisieren
+                        next_seq = Some(seq); // large jumps: resynchronise
                     }
                     continue;
                 }
@@ -238,13 +238,13 @@ mod tests {
     #[test]
     fn unknown_codec_is_rejected() {
         assert!(Codec::new(&params(99)).is_err());
-        assert!(Codec::new(&params(4)).is_err()); // AAC-LC wird nicht unterstützt
+        assert!(Codec::new(&params(4)).is_err()); // AAC-LC is not supported
     }
 
     #[test]
     fn decrypt_reverses_cbc_and_keeps_the_tail() {
         let (key, iv) = ([7u8; 16], [9u8; 16]);
-        let plain: Vec<u8> = (0..37u8).collect(); // 2 volle Blöcke + 5 Byte Rest
+        let plain: Vec<u8> = (0..37u8).collect(); // 2 whole blocks + 5 bytes remainder
         let mut enc = plain.clone();
         cbc::Encryptor::<Aes128>::new((&key).into(), (&iv).into())
             .encrypt_padded::<NoPadding>(&mut enc[..32], 32)

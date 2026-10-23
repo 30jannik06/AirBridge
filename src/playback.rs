@@ -1,6 +1,6 @@
-// Audio-Wiedergabe über die Standard-Lautsprecher (cpal = WASAPI unter Windows).
-// Das Gerät läuft meist mit 48 kHz, das iPhone liefert 44,1 kHz: darum rechnen wir die Abtastrate um.
-// Zwischen Netzwerk-Thread (liefert Töne) und Audio-Thread (holt Töne) liegt eine kleine Warteschlange.
+// Audio playback on the default speakers (cpal = WASAPI on Windows).
+// The device usually runs at 48 kHz while the iPhone delivers 44.1 kHz, so we convert the sample rate.
+// A small queue sits between the network thread (delivers sound) and the audio thread (fetches sound).
 use anyhow::{Result, anyhow, bail};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Error, FromSample, SampleFormat, SizedSample, StreamConfig};
@@ -10,15 +10,15 @@ use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
 use std::time::Duration;
 
-/// Lautstärke vom iPhone in dB (0 = voll, -144 = stumm), als Bits in einem Atomic, damit jeder Thread sie setzen kann.
+/// Volume from the iPhone in dB (0 = full, -144 = mute), stored as bits in an atomic so any thread can set it.
 static VOLUME_DB_BITS: AtomicU32 = AtomicU32::new(0);
 
-/// Setzt die Lautstärke (AirPlay-Skala: 0 dB = voll, etwa -30 dB = sehr leise, -144 = stumm).
+/// Sets the volume (AirPlay scale: 0 dB = full, about -30 dB = very quiet, -144 = mute).
 pub fn set_volume_db(db: f32) {
     VOLUME_DB_BITS.store(db.to_bits(), Ordering::Relaxed);
 }
 
-/// Faktor, mit dem die Samples multipliziert werden.
+/// Factor the samples are multiplied by.
 pub fn gain() -> f32 {
     let db = f32::from_bits(VOLUME_DB_BITS.load(Ordering::Relaxed));
     if db <= -144.0 {
@@ -28,26 +28,26 @@ pub fn gain() -> f32 {
     }
 }
 
-/// Die letzten Samples (Mono) für die Spektrum-Anzeige.
+/// The latest samples (mono) for the spectrum display.
 static SCOPE: Mutex<Vec<f32>> = Mutex::new(Vec::new());
 
-/// Gibt die letzten `crate::spectrum::N` Samples zurück (oder weniger, wenn noch nicht genug da sind).
+/// Returns the last `crate::spectrum::N` samples (or fewer if there are not enough yet).
 pub fn scope() -> Vec<f32> {
     SCOPE.lock().map(|s| s.clone()).unwrap_or_default()
 }
 
-const PREFILL_MS: usize = 60; // erst abspielen, wenn so viel Ton im Puffer liegt (verhindert Knacken)
-const MAX_MS: usize = 300; // liegt mehr im Puffer, holen wir auf (verwerfen Altes), sonst wächst die Verzögerung
+const PREFILL_MS: usize = 60; // only start playing once this much sound is buffered (prevents crackling)
+const MAX_MS: usize = 300; // if more is buffered we catch up (drop old data), otherwise the delay keeps growing
 const KEEP_MS: usize = 120;
 
 struct Shared {
-    queue: VecDeque<f32>, // Stereo, abwechselnd links/rechts, in der Abtastrate des Geräts
+    queue: VecDeque<f32>, // stereo, alternating left/right, at the device sample rate
     primed: bool,
 }
 
 struct ResampleState {
-    prev: [f32; 2], // letzter Frame des vorherigen Blocks
-    pos: f64,       // Leseposition relativ zu `prev`
+    prev: [f32; 2], // last frame of the previous block
+    pos: f64,       // read position relative to `prev`
 }
 
 pub struct Player {
@@ -56,7 +56,7 @@ pub struct Player {
     dev_rate: u32,
 }
 
-/// Öffnet das Standard-Ausgabegerät. Der Audio-Strom lebt in einem eigenen Thread, bis `stop` gesetzt wird.
+/// Opens the default output device. The audio stream lives in its own thread until `stop` is set.
 pub fn start(stop: Arc<AtomicBool>) -> Result<Player> {
     let shared = Arc::new(Mutex::new(Shared {
         queue: VecDeque::new(),
@@ -70,7 +70,7 @@ pub fn start(stop: Arc<AtomicBool>) -> Result<Player> {
             while !stop.load(Ordering::Relaxed) {
                 thread::sleep(Duration::from_millis(100));
             }
-            drop(stream); // beendet die Wiedergabe
+            drop(stream); // ends playback
         }
         Err(e) => {
             let _ = tx.send(Err(format!("{e:#}")));
@@ -120,10 +120,10 @@ where
     T: SizedSample + FromSample<f32>,
 {
     let channels = config.channels as usize;
-    let prefill = config.sample_rate as usize * 2 * PREFILL_MS / 1000; // in Einzelwerten (2 pro Frame)
+    let prefill = config.sample_rate as usize * 2 * PREFILL_MS / 1000; // in single values (2 per frame)
     let shared = Arc::clone(shared);
 
-    // Wird vom Audio-System aufgerufen, sobald es neue Töne braucht.
+    // Called by the audio system as soon as it needs more sound.
     let callback = move |data: &mut [T], _: &cpal::OutputCallbackInfo| {
         let mut s = shared.lock().unwrap();
         if !s.primed && s.queue.len() >= prefill {
@@ -134,7 +134,7 @@ where
                 match (s.queue.pop_front(), s.queue.pop_front()) {
                     (Some(l), Some(r)) => (l, r),
                     _ => {
-                        s.primed = false; // Puffer leer: neu auffüllen lassen
+                        s.primed = false; // buffer empty: let it fill up again
                         (0.0, 0.0)
                     }
                 }
@@ -158,7 +158,7 @@ where
 }
 
 impl Player {
-    /// Nimmt dekodierte 16-Bit-PCM-Daten (abwechselnd links/rechts) an und reiht sie zur Wiedergabe ein.
+    /// Takes decoded 16-bit PCM data (alternating left/right) and queues it for playback.
     pub fn push(&self, pcm: &[i16], channels: usize, src_rate: u32) {
         if channels == 0 || pcm.len() < channels {
             return;
@@ -187,7 +187,7 @@ impl Player {
             }
         }
 
-        // Lineare Interpolation von src_rate auf die Geräte-Abtastrate.
+        // Linear interpolation from src_rate to the device sample rate.
         let mut rs = self.resample.lock().unwrap();
         let prev = rs.prev;
         let at = |i: usize| if i == 0 { prev } else { frames[i - 1] };
@@ -212,7 +212,7 @@ impl Player {
         let per_ms = self.dev_rate as usize * 2 / 1000;
         if s.queue.len() > MAX_MS * per_ms {
             let excess = s.queue.len() - KEEP_MS * per_ms;
-            s.queue.drain(..excess & !1); // gerade Anzahl, damit links/rechts nicht vertauscht werden
+            s.queue.drain(..excess & !1); // even count so left/right do not get swapped
         }
     }
 }
@@ -229,7 +229,7 @@ mod tests {
         assert!((gain() - 0.1).abs() < 1e-4);
         set_volume_db(-144.0);
         assert_eq!(gain(), 0.0);
-        set_volume_db(5.0); // über 0 dB wird nicht verstärkt
+        set_volume_db(5.0); // above 0 dB there is no amplification
         assert!((gain() - 1.0).abs() < 1e-6);
         set_volume_db(0.0);
     }

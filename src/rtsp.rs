@@ -1,4 +1,4 @@
-// Minimaler RTSP/HTTP-Server auf Port 7000. Ein Thread pro Verbindung.
+// Minimal RTSP/HTTP server on port 7000. One thread per connection.
 use crate::config;
 use crate::fairplay::FairPlay;
 use crate::identity::Identity;
@@ -16,7 +16,7 @@ use std::thread;
 struct Request {
     method: String,
     path: String,
-    proto: String, // "RTSP/1.0" oder "HTTP/1.1" - Antwort muss dasselbe sprechen
+    proto: String, // "RTSP/1.0" or "HTTP/1.1" - the reply must speak the same
     headers: HashMap<String, String>,
     body: Vec<u8>,
 }
@@ -62,10 +62,10 @@ pub fn serve(identity: Arc<Identity>, mirror: Slot) -> Result<()> {
     log!("RTSP lauscht auf Port {}", config::RTSP_PORT);
     for stream in listener.incoming() {
         let stream = stream?;
-        // Arc = geteilter Besitz: jeder Thread bekommt einen eigenen "Zeiger" auf dieselbe Identity.
+        // Arc = shared ownership: every thread gets its own "pointer" to the same Identity.
         let identity = Arc::clone(&identity);
         let mirror = Arc::clone(&mirror);
-        // `move` verschiebt `stream` und `identity` in den neuen Thread (Ownership-Transfer).
+        // `move` moves `stream` and `identity` into the new thread (ownership transfer).
         thread::spawn(move || {
             let peer = stream
                 .peer_addr()
@@ -113,14 +113,14 @@ fn handle(stream: TcpStream, identity: &Identity, mirror: &Slot) -> Result<()> {
     Ok(())
 }
 
-/// Alles, was zu EINER TCP-Verbindung gehört.
+/// Everything that belongs to ONE TCP connection.
 #[derive(Default)]
 struct Conn {
-    verify: Option<VerifySession>, // Option = "vielleicht noch nicht vorhanden"
+    verify: Option<VerifySession>, // Option = "may not exist yet"
     fairplay: FairPlay,
     stream: StreamState,
     peer_ip: Option<IpAddr>,
-    music: bool, // diese Verbindung hat Musik-Infos geschickt (wird beim Ende wieder gelöscht)
+    music: bool, // this connection sent music info (cleared again when it ends)
 }
 
 fn route(req: &Request, id: &Identity, conn: &mut Conn, mirror: &Slot) -> Result<Response> {
@@ -149,7 +149,7 @@ fn route(req: &Request, id: &Identity, conn: &mut Conn, mirror: &Slot) -> Result
             "text/parameters",
             b"volume: 0.000000\r\n".to_vec(),
         )),
-        // Lautstärke, Titel, Cover und Fortschritt vom iPhone (siehe music.rs)
+        // Volume, title, cover and progress from the iPhone (see music.rs)
         ("SET_PARAMETER", _) => {
             let content_type = req
                 .headers
@@ -169,7 +169,7 @@ fn route(req: &Request, id: &Identity, conn: &mut Conn, mirror: &Slot) -> Result
             };
             Ok(Response::ok("application/octet-stream", reply))
         }
-        // Mit Content-Type = erste Anfrage mit "qualifier"-Plist, ohne = die vollständige Geräteinfo.
+        // With Content-Type = first request with a "qualifier" plist, without = the full device info.
         ("GET", "/info") if req.headers.contains_key("content-type") => Ok(Response::ok(
             "application/x-apple-binary-plist",
             info_plist(id)?,
@@ -199,13 +199,39 @@ fn route(req: &Request, id: &Identity, conn: &mut Conn, mirror: &Slot) -> Result
             _ => Err(anyhow!("leerer pair-verify Body")),
         },
         _ => {
-            log!("   (noch nicht implementiert)");
+            // Unknown request (e.g. AirPlay video by link, `POST /play`): log what it contains so it can be analysed.
+            log!("   (noch nicht implementiert) {}", describe_body(req));
             Ok(Response::status(501, "Not Implemented"))
         }
     }
 }
 
-/// Vollständige Antwort auf GET /info (wie UxPlay), inkl. Audio-Formaten und Display.
+/// One-line description of a request body for the log: the plist content if it is one, otherwise the size.
+fn describe_body(req: &Request) -> String {
+    if req.body.is_empty() {
+        return String::new();
+    }
+    match Value::from_reader(std::io::Cursor::new(&req.body)) {
+        Ok(plist) => {
+            let mut text = format!("{plist:?}");
+            if text.len() > 600 {
+                text.truncate(600);
+                text.push('…');
+            }
+            format!("[plist] {text}")
+        }
+        Err(_) => format!(
+            "[{} bytes, {}]",
+            req.body.len(),
+            req.headers
+                .get("content-type")
+                .map(String::as_str)
+                .unwrap_or("no content-type")
+        ),
+    }
+}
+
+/// Full reply to GET /info (like UxPlay), including audio formats and display.
 fn info_plist_full(id: &Identity) -> Result<Vec<u8>> {
     let s = |v: &str| Value::String(v.to_string());
     let n = |v: u64| Value::Integer(v.into());
@@ -312,7 +338,7 @@ fn info_plist(id: &Identity) -> Result<Vec<u8>> {
 fn read_request(reader: &mut BufReader<TcpStream>) -> Result<Option<Request>> {
     let mut line = String::new();
     if reader.read_line(&mut line)? == 0 {
-        return Ok(None); // Gegenseite hat die Verbindung geschlossen
+        return Ok(None); // the other side closed the connection
     }
     let mut parts = line.split_whitespace();
     let method = parts

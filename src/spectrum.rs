@@ -1,16 +1,16 @@
-// Spektrum für die Musik-Anzeige: aus den letzten Samples werden per FFT einige Balken berechnet.
+// Spectrum for the music view: a few bars are computed from the latest samples with an FFT.
 use std::f32::consts::PI;
 
-pub const N: usize = 1024; // Fenstergröße der FFT (Potenz von 2)
+pub const N: usize = 1024; // FFT window size (power of 2)
 pub const BANDS: usize = 32;
 const RATE: f32 = 44100.0;
 const F_MIN: f32 = 60.0;
 const F_MAX: f32 = 14000.0;
 
-/// FFT, in place, Länge muss eine Potenz von 2 sein (Radix-2, iterativ).
+/// FFT, in place, the length must be a power of 2 (radix-2, iterative).
 fn fft(re: &mut [f32], im: &mut [f32]) {
     let n = re.len();
-    // Bit-Umkehr-Reihenfolge
+    // bit-reversal order
     let mut j = 0;
     for i in 1..n {
         let mut bit = n >> 1;
@@ -46,7 +46,7 @@ fn fft(re: &mut [f32], im: &mut [f32]) {
     }
 }
 
-/// Berechnet `BANDS` Werte (0..1) aus genau `N` Samples. Die Bänder sind logarithmisch verteilt.
+/// Computes `BANDS` values (0..1) from exactly `N` samples. The bands are spread logarithmically.
 pub fn bands(samples: &[f32]) -> [f32; BANDS] {
     let mut out = [0.0; BANDS];
     if samples.len() < N {
@@ -69,7 +69,7 @@ pub fn bands(samples: &[f32]) -> [f32; BANDS] {
         let peak = (first..last)
             .map(|k| (re[k] * re[k] + im[k] * im[k]).sqrt() / (N as f32 / 4.0))
             .fold(0.0f32, f32::max);
-        let db = 20.0 * peak.max(1e-6).log10(); // 0 dB = Vollaussteuerung
+        let db = 20.0 * peak.max(1e-6).log10(); // 0 dB = full scale
         *slot = ((db + 60.0) / 60.0).clamp(0.0, 1.0);
     }
     out
@@ -103,13 +103,13 @@ mod tests {
         };
         let (low, mid, high) = (loudest(150.0), loudest(1000.0), loudest(8000.0));
         assert!(low < mid && mid < high, "{low} {mid} {high}");
-        // 1 kHz liegt auf der logarithmischen Skala etwa in der Mitte
+        // 1 kHz is roughly in the middle on the logarithmic scale
         assert!((12..=22).contains(&mid), "{mid}");
     }
 
     #[test]
     fn fft_matches_a_known_signal() {
-        // Impuls -> flaches Spektrum mit Betrag 1
+        // impulse -> flat spectrum with magnitude 1
         let mut re = vec![0.0; 8];
         let mut im = vec![0.0; 8];
         re[0] = 1.0;

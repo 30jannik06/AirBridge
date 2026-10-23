@@ -1,24 +1,24 @@
-// "Läuft gerade": Titel, Interpret, Album, Cover, Fortschritt und Lautstärke, die das iPhone per RTSP SET_PARAMETER schickt.
-//   Content-Type application/x-dmap-tagged  -> Titel-Infos (DAAP/DMAP: 4 Byte Kennung, 4 Byte Länge, Daten)
-//   Content-Type image/jpeg oder image/png  -> Cover
-//   Content-Type text/parameters            -> "progress: start/aktuell/ende" (in 44100stel Sekunden) und "volume: -12.5"
+// "Now playing": title, artist, album, cover, progress and volume that the iPhone sends via RTSP SET_PARAMETER.
+//   Content-Type application/x-dmap-tagged  -> track info (DAAP/DMAP: 4-byte tag, 4-byte length, data)
+//   Content-Type image/jpeg or image/png    -> cover
+//   Content-Type text/parameters            -> "progress: start/current/end" (in 44100ths of a second) and "volume: -12.5"
 use crate::shared;
 use std::sync::Arc;
 use std::time::Instant;
 
 const RATE: f64 = 44100.0;
 
-/// Wo wir das iPhone für Fernsteuerung (Play/Pause/…) erreichen.
+/// Where we reach the iPhone for remote control (play/pause/...).
 #[derive(Clone, Debug)]
 pub struct Dacp {
-    pub id: String,                              // DACP-ID aus den RTSP-Headern
-    pub remote: String,                          // Active-Remote aus den RTSP-Headern
-    pub target: Option<(std::net::IpAddr, u16)>, // Adresse und Port des Fernsteuer-Dienstes, sobald per mDNS gefunden
+    pub id: String,                              // DACP-ID from the RTSP headers
+    pub remote: String,                          // Active-Remote from the RTSP headers
+    pub target: Option<(std::net::IpAddr, u16)>, // address and port of the remote control service, once found via mDNS
 }
 
 #[derive(Clone, Debug)]
 pub struct Progress {
-    pub position: f64, // Sekunden zum Zeitpunkt `at`
+    pub position: f64, // seconds at the time `at`
     pub duration: f64,
     pub at: Instant,
 }
@@ -29,7 +29,7 @@ pub struct Music {
     pub artist: String,
     pub album: String,
     pub cover: Option<Arc<Vec<u8>>>,
-    pub cover_gen: u64, // zählt hoch, wenn ein neues Cover kam
+    pub cover_gen: u64, // counts up whenever a new cover arrived
     pub progress: Option<Progress>,
     pub volume_db: f32,
     pub dacp: Option<Dacp>,
@@ -40,7 +40,7 @@ impl Music {
         !self.title.is_empty() || !self.artist.is_empty()
     }
 
-    /// Aktuelle Position; läuft die Wiedergabe, wird seit der letzten Meldung weitergezählt.
+    /// Current position; while playing, it keeps counting since the last report.
     pub fn position_now(&self, playing: bool) -> Option<(f64, f64)> {
         let p = self.progress.as_ref()?;
         let extra = if playing {
@@ -60,8 +60,8 @@ pub struct Meta {
     pub album: Option<String>,
 }
 
-/// Liest die Titel-Infos aus einem DMAP-Block. Unbekannte Felder werden übersprungen,
-/// kaputte oder abgeschnittene Daten führen nur zu weniger Ergebnissen (kein Absturz).
+/// Reads the track info from a DMAP block. Unknown fields are skipped,
+/// broken or truncated data only leads to fewer results (no crash).
 pub fn parse_dmap(data: &[u8]) -> Meta {
     let mut meta = Meta::default();
     walk(data, &mut meta, 0);
@@ -81,7 +81,7 @@ fn walk(data: &[u8], meta: &mut Meta, depth: u8) {
             b"minm" => meta.title = text(),
             b"asar" => meta.artist = text(),
             b"asal" => meta.album = text(),
-            // Container, in denen die Felder verschachtelt sein können
+            // Containers in which the fields can be nested
             b"mlit" | b"mcon" | b"cmpa" if depth < 4 => walk(body, meta, depth + 1),
             _ => {}
         }
@@ -89,7 +89,7 @@ fn walk(data: &[u8], meta: &mut Meta, depth: u8) {
     }
 }
 
-/// "progress: start/aktuell/ende" -> (Position, Länge) in Sekunden.
+/// "progress: start/current/end" -> (position, length) in seconds.
 pub fn parse_progress(text: &str) -> Option<(f64, f64)> {
     let value = text
         .lines()
@@ -106,7 +106,7 @@ pub fn parse_progress(text: &str) -> Option<(f64, f64)> {
     Some(((current - start) / RATE, (end - start) / RATE))
 }
 
-/// Liest die Lautstärke aus "volume: -15.000000" (dB).
+/// Reads the volume from "volume: -15.000000" (dB).
 pub fn parse_volume(body: &[u8]) -> Option<f32> {
     let text = std::str::from_utf8(body).ok()?;
     let value = text
@@ -115,7 +115,7 @@ pub fn parse_volume(body: &[u8]) -> Option<f32> {
     value.trim().parse().ok()
 }
 
-/// Verarbeitet ein SET_PARAMETER vom iPhone. Gibt `true` zurück, wenn es Musik-Infos waren.
+/// Handles a SET_PARAMETER from the iPhone. Returns `true` if it was music info.
 pub fn set_parameter(content_type: &str, body: &[u8]) -> bool {
     let ct = content_type.to_ascii_lowercase();
     if ct.starts_with("application/x-dmap-tagged") {
@@ -162,13 +162,13 @@ pub fn set_parameter(content_type: &str, body: &[u8]) -> bool {
     }
 }
 
-/// Alles vergessen (Wiedergabe beendet).
+/// Forget everything (playback ended).
 pub fn clear() {
     shared::with(|s| {
         let (dacp, generation) = (s.music.dacp.clone(), s.music.cover_gen + 1);
         s.music = Music::default();
         s.music.dacp = dacp;
-        s.music.cover_gen = generation; // andere Zahl als vorher, damit die Oberfläche das alte Cover verwirft
+        s.music.cover_gen = generation; // a different number than before, so the interface drops the old cover
     });
     shared::wake();
 }
@@ -189,7 +189,7 @@ mod tests {
         let mut inner = tag(b"minm", "Song Ü".as_bytes());
         inner.extend(tag(b"asar", b"Band"));
         inner.extend(tag(b"asal", b"Album"));
-        inner.extend(tag(b"asgn", b"Rock")); // unbekannt, wird übersprungen
+        inner.extend(tag(b"asgn", b"Rock")); // unknown, gets skipped
         assert_eq!(
             parse_dmap(&inner),
             Meta {
@@ -209,7 +209,7 @@ mod tests {
             let _ = parse_dmap(&full[..n]);
         }
         assert_eq!(parse_dmap(&full[..full.len() - 1]).title, None);
-        let _ = parse_dmap(&[0xff; 64]); // riesige Längen
+        let _ = parse_dmap(&[0xff; 64]); // huge lengths
         let _ = parse_dmap(b"");
     }
 
@@ -218,7 +218,7 @@ mod tests {
         let (pos, dur) = parse_progress("progress: 1000/89200/45000000\r\n").unwrap();
         assert!((pos - 2.0).abs() < 1e-9);
         assert!((dur - (45_000_000.0 - 1000.0) / 44100.0).abs() < 1e-6);
-        assert!(parse_progress("progress: 10/5/20").is_none()); // aktuell vor Start
+        assert!(parse_progress("progress: 10/5/20").is_none()); // current before start
         assert!(parse_progress("progress: a/b/c").is_none());
         assert!(parse_progress("volume: -3").is_none());
     }

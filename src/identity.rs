@@ -15,15 +15,15 @@ pub fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
-/// Dauerhafte Ed25519-Identität des Receivers. Wird einmal erzeugt und in einer
-/// Datei gespeichert, damit das iPhone uns beim nächsten Start wiedererkennt.
+/// Persistent Ed25519 identity of the receiver. It is created once and stored in a
+/// file so the iPhone recognises us the next time.
 pub struct Identity {
     pub signing: SigningKey,
 }
 
-/// Wo der Schlüssel liegt:
-/// - **Portable Version** (Datei `portable.txt` neben der .exe): Schlüssel neben der .exe, es bleibt alles in einem Ordner.
-/// - **Installierte Version** (Normalfall): `%APPDATA%\AirBridge`, denn unter "Program Files" darf man nicht schreiben.
+/// Where the key lives:
+/// - **Portable version** (file `portable.txt` next to the exe): key next to the exe, everything stays in one folder.
+/// - **Installed version** (normal case): `%APPDATA%\AirBridge`, because you may not write under "Program Files".
 pub fn key_path() -> PathBuf {
     let exe_dir = std::env::current_exe()
         .ok()
@@ -39,8 +39,8 @@ pub fn key_path() -> PathBuf {
         .unwrap_or_default();
     let dir = base.join("AirBridge");
     let path = dir.join(KEY_FILE);
-    // Ältere Versionen legten den Schlüssel im Arbeitsverzeichnis ab: einmalig übernehmen, damit
-    // das iPhone das Gerät wiedererkennt.
+    // Older versions stored the key in the working directory: take it over once so
+    // the iPhone recognises the device.
     if !path.exists() && Path::new(KEY_FILE).exists() {
         let _ = fs::create_dir_all(&dir);
         let _ = fs::copy(KEY_FILE, &path);
@@ -51,7 +51,7 @@ pub fn key_path() -> PathBuf {
 impl Identity {
     pub fn load_or_create(path: &Path) -> Result<Self> {
         let seed: [u8; 32] = match fs::read(path) {
-            // `try_into` wandelt den Vec in ein Array fester Länge um (schlägt fehl, wenn != 32)
+            // `try_into` converts the Vec into an array of fixed length (fails if != 32)
             Ok(bytes) => bytes
                 .try_into()
                 .map_err(|_| anyhow!("{} ist beschädigt (muss 32 Byte sein)", path.display()))?,
@@ -74,7 +74,7 @@ impl Identity {
         self.signing.verifying_key().to_bytes()
     }
 
-    /// 16 Byte, die nur von DIESEM Schlüssel abhängen: so bekommt jede Installation stabile, eindeutige Kennungen.
+    /// 16 bytes that depend only on THIS key: this gives every installation stable, unique identifiers.
     fn fingerprint(&self, label: &str) -> [u8; 16] {
         let mut h = Sha512::new();
         h.update(label.as_bytes());
@@ -84,7 +84,7 @@ impl Identity {
         out
     }
 
-    /// Gerätekennung im MAC-Format ("AA:BB:..."). Bit 1 = "lokal vergeben", Bit 0 = "keine Multicast-Adresse".
+    /// Device identifier in MAC format ("AA:BB:..."). Bit 1 = "locally administered", bit 0 = "not a multicast address".
     pub fn device_id(&self) -> String {
         let mut mac: [u8; 6] = self.fingerprint("AirBridge-DeviceID")[..6]
             .try_into()
@@ -96,7 +96,7 @@ impl Identity {
             .join(":")
     }
 
-    /// Pairing-Identifier als UUID-Text (Version 4).
+    /// Pairing identifier as UUID text (version 4).
     pub fn pi(&self) -> String {
         let mut b = self.fingerprint("AirBridge-PI");
         b[6] = (b[6] & 0x0f) | 0x40;

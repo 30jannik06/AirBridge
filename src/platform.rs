@@ -1,4 +1,4 @@
-// Windows-spezifische Helfer: Konsole ausblenden, Dialoge, Firewall-Regel.
+// Windows-specific helpers: hide the console, dialogs, firewall rule.
 use anyhow::{Result, bail};
 use std::os::windows::process::CommandExt;
 use std::process::Command;
@@ -12,8 +12,8 @@ use windows::core::{HSTRING, w};
 const RULE_NAME: &str = "AirBridge";
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
-/// Doppelklick-Start: Das Programm ist allein an der Konsole -> Fenster schließen.
-/// Start aus PowerShell/cmd (oder cargo): Die Konsole gehört auch anderen -> bleibt, damit man das Log sieht.
+/// Started by double click: the program is alone on the console -> close the window.
+/// Started from PowerShell/cmd (or cargo): the console also belongs to others -> it stays, so you can see the log.
 pub fn hide_console_if_alone() {
     let mut ids = [0u32; 4];
     if unsafe { GetConsoleProcessList(&mut ids) } == 1 {
@@ -21,7 +21,7 @@ pub fn hide_console_if_alone() {
     }
 }
 
-/// Zeigt einen Dialog. Nötig, weil Fehler sonst unsichtbar wären, wenn die Konsole ausgeblendet ist.
+/// Shows a dialog. Needed because errors would otherwise be invisible when the console is hidden.
 pub fn message(title: &str, text: &str, error: bool) {
     let icon = if error {
         MB_ICONERROR
@@ -40,8 +40,8 @@ pub fn message(title: &str, text: &str, error: bool) {
 
 const RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
 
-/// Schaltet "Mit Windows starten" ein oder aus (Eintrag im Run-Schlüssel des aktuellen Nutzers, ohne Adminrechte).
-/// Gestartet wird mit `--minimized`: AirBridge sitzt dann nur im Tray.
+/// Turns "start with Windows" on or off (entry in the current user's Run key, no admin rights needed).
+/// It starts with `--minimized`: AirBridge then only sits in the tray.
 pub fn set_autostart(on: bool) -> Result<()> {
     let reg = |args: &[String]| -> Result<bool> {
         Ok(Command::new("reg")
@@ -65,7 +65,7 @@ pub fn set_autostart(on: bool) -> Result<()> {
             "/f".into(),
         ])?
     } else {
-        // Fehlt der Eintrag schon, ist das auch in Ordnung.
+        // If the entry is already gone, that is fine too.
         let _ = reg(&[
             "delete".into(),
             RUN_KEY.into(),
@@ -82,8 +82,8 @@ pub fn set_autostart(on: bool) -> Result<()> {
     }
 }
 
-/// Legt die Firewall-Regel an (`install = true`) oder entfernt sie. Braucht Administratorrechte:
-/// Ohne diese startet sich das Programm selbst neu (Windows fragt dann per UAC nach der Erlaubnis).
+/// Creates the firewall rule (`install = true`) or removes it. Needs administrator rights:
+/// without them the program restarts itself (Windows then asks for permission via UAC).
 pub fn firewall(install: bool) -> Result<()> {
     let exe = std::env::current_exe()?.to_string_lossy().to_string();
     let flag = if install {
@@ -106,7 +106,7 @@ pub fn firewall(install: bool) -> Result<()> {
         if result.0 as usize <= 32 {
             bail!("Administratorrechte wurden nicht erteilt");
         }
-        return Ok(()); // der neue, erhöhte Prozess erledigt den Rest und zeigt das Ergebnis an
+        return Ok(()); // the new, elevated process does the rest and shows the result
     }
 
     let netsh = |args: &[String]| -> Result<(bool, String)> {
@@ -121,7 +121,7 @@ pub fn firewall(install: bool) -> Result<()> {
         ))
     };
     let delete = vec!["delete".into(), "rule".into(), format!("name={RULE_NAME}")];
-    let (deleted, _) = netsh(&delete)?; // alte Regel entfernen, damit nichts doppelt existiert
+    let (deleted, _) = netsh(&delete)?; // remove the old rule so nothing exists twice
 
     if !install {
         message(

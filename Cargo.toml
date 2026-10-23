@@ -49,6 +49,7 @@ x25519-dalek = "3.0.0"
 
 [build-dependencies]
 cc = "1.9.0"
+winresource = "0.1.34"
 
 [profile.release]
 lto = true         # smaller and faster binary

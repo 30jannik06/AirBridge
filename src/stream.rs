@@ -1,7 +1,7 @@
-// RTSP SETUP: Schlüssel ableiten und Ports für Video/Audio bereitstellen.
-// iOS schickt SETUP zweimal:
-//   1. mit `ekey`/`eiv` (verschlüsselter Schlüssel) -> wir antworten mit timingPort/eventPort
-//   2. mit `streams` (Typ 110 = Mirroring-Video, 96 = Audio) -> wir antworten mit dataPort
+// RTSP SETUP: derive keys and provide ports for video/audio.
+// iOS sends SETUP twice:
+//   1. with `ekey`/`eiv` (encrypted key) -> we reply with timingPort/eventPort
+//   2. with `streams` (type 110 = mirroring video, 96 = audio) -> we reply with dataPort
 #[cfg(feature = "audio")]
 use crate::audio::{self, AudioParams};
 use crate::config;
@@ -16,15 +16,15 @@ use std::net::{IpAddr, SocketAddr, UdpSocket};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-/// Pro Verbindung: der entschlüsselte Basisschlüssel und offen gehaltene UDP-Sockets.
+/// Per connection: the decrypted base key and UDP sockets kept open.
 #[derive(Default)]
 pub struct StreamState {
     aes_key: Option<[u8; 16]>,
     #[cfg_attr(not(feature = "audio"), allow(dead_code))]
-    aes_iv: Option<[u8; 16]>, // `eiv` aus SETUP 1, wird für die Audio-Entschlüsselung gebraucht
-    // Solange die Sockets leben, bleiben ihre Ports reserviert (Drop = Port frei).
+    aes_iv: Option<[u8; 16]>, // `eiv` from SETUP 1, needed for audio decryption
+    // As long as the sockets live, their ports stay reserved (drop = port free).
     _sockets: Vec<UdpSocket>,
-    stop: Arc<AtomicBool>, // beendet den NTP-Thread, wenn die Verbindung endet
+    stop: Arc<AtomicBool>, // ends the NTP thread when the connection ends
 }
 
 impl Drop for StreamState {
@@ -62,12 +62,12 @@ pub fn setup(
         .ok_or_else(|| anyhow!("SETUP-Body ist kein Dictionary"))?;
     let mut res = Dictionary::new();
 
-    // --- SETUP 1: Schlüssel ---
+    // --- SETUP 1: keys ---
     if let (Some(ekey), Some(eiv)) = (
         dict.get("ekey").and_then(|v| v.as_data()),
         dict.get("eiv").and_then(|v| v.as_data()),
     ) {
-        // Sicherheit: erst fragen (falls eingestellt), dann Schlüssel entschlüsseln.
+        // Security: ask first (if configured), then decrypt the key.
         let text = |key: &str| {
             dict.get(key)
                 .and_then(|v| v.as_string())
@@ -82,7 +82,7 @@ pub fn setup(
             bail!("Verbindung von {device_name} wurde abgelehnt");
         }
         let fp_key = fp.decrypt_key(ekey)?;
-        // Mit Legacy-Pairing wird der FairPlay-Schlüssel noch mit dem ECDH-Geheimnis gehasht.
+        // With legacy pairing the FairPlay key is additionally hashed with the ECDH secret.
         let key: [u8; 16] = match ecdh_secret {
             Some(secret) => sha512(&[&fp_key, &secret])[..16].try_into()?,
             None => fp_key,
@@ -93,7 +93,7 @@ pub fn setup(
                 .map_err(|_| anyhow!("eiv hat nicht 16 Byte"))?,
         );
 
-        // Timing: wir fragen das iPhone per NTP nach der Zeit (siehe ntp.rs).
+        // Timing: we ask the iPhone for the time via NTP (see ntp.rs).
         let socket = UdpSocket::bind(("0.0.0.0", 0))?;
         let timing = socket.local_addr()?.port();
         let remote_port = dict.get("timingPort").and_then(|v| v.as_unsigned_integer());
@@ -111,7 +111,7 @@ pub fn setup(
         log!("   SETUP 1: Schlüssel entschlüsselt, timingPort {timing}");
     }
 
-    // --- SETUP 2: Streams ---
+    // --- SETUP 2: streams ---
     if let Some(streams) = dict.get("streams").and_then(|v| v.as_array()) {
         let mut out = Vec::new();
         for s in streams {
@@ -173,8 +173,8 @@ pub fn setup(
                         let iv = st.aes_iv.ok_or_else(|| anyhow!("Audio-Setup ohne eiv"))?;
                         audio::start(data, control, key, iv, params, Arc::clone(&st.stop));
                     }
-                    // Ohne das Feature `audio` beantworten wir die Anfrage trotzdem (das iPhone erwartet Ports),
-                    // halten die Sockets offen und werfen die Audiopakete einfach weg: Bild ohne Ton.
+                    // Without the `audio` feature we still answer the request (the iPhone expects ports),
+                    // keep the sockets open and simply drop the audio packets: picture without sound.
                     #[cfg(not(feature = "audio"))]
                     {
                         log!(

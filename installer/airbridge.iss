@@ -17,6 +17,7 @@ UninstallDisplayIcon={app}\airbridge.exe
 OutputDir=..\dist
 OutputBaseFilename=AirBridge-Setup-{#AppVersion}
 LicenseFile=..\LICENSE
+SetupIconFile=..\assets\airbridge.ico
 Compression=lzma2
 SolidCompression=yes
 ArchitecturesAllowed=x64compatible

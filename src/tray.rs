@@ -1,5 +1,5 @@
-// Symbol im Infobereich der Taskleiste (Tray): Linksklick öffnet das Fenster, Rechtsklick zeigt ein kleines Menü.
-// Die Ereignisse kommen aus dem Windows-Nachrichtenloop; wir leiten sie über einen Kanal an die Oberfläche weiter.
+// Icon in the notification area of the taskbar (tray): left click opens the window, right click shows a small menu.
+// The events come from the Windows message loop; we pass them on to the interface through a channel.
 use anyhow::Result;
 use eframe::egui;
 use std::sync::mpsc::{Receiver, channel};
@@ -12,7 +12,7 @@ pub enum TrayAction {
 }
 
 pub struct Tray {
-    _icon: TrayIcon, // Muss am Leben bleiben, sonst verschwindet das Symbol
+    _icon: TrayIcon, // must stay alive, otherwise the icon disappears
     pub rx: Receiver<TrayAction>,
 }
 

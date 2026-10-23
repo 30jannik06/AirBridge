@@ -1,5 +1,5 @@
-// Zustand, den Netzwerk-Threads und Oberfläche gemeinsam nutzen: Log, Einstellungen, wartende Verbindungsanfrage.
-// Ein einziges globales `Mutex` (statt vieler Kanäle) hält das einfach; die Sperre wird nie lange gehalten.
+// State shared by the network threads and the interface: log, settings, pending connection request.
+// One single global `Mutex` (instead of many channels) keeps this simple; the lock is never held for long.
 use crate::settings::{self, Settings, Trusted};
 use std::collections::VecDeque;
 use std::sync::mpsc::{self, Sender};
@@ -9,7 +9,7 @@ use std::time::Duration;
 const MAX_LOG: usize = 400;
 const APPROVAL_TIMEOUT: Duration = Duration::from_secs(30);
 
-/// Antwort des Nutzers auf "Darf dieses Gerät spiegeln?".
+/// The user's answer to "May this device mirror?".
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Decision {
     Once,
@@ -24,7 +24,7 @@ pub struct Pending {
     reply: Sender<Decision>,
 }
 
-/// Befehle der Oberfläche an den Netzwerk-Thread.
+/// Commands from the interface to the network thread.
 pub enum NetCmd {
     Rename(String),
 }
@@ -32,7 +32,7 @@ pub enum NetCmd {
 pub struct Shared {
     pub settings: Settings,
     pub log: VecDeque<String>,
-    pub device: Option<String>, // Name des iPhones, das zuletzt verbunden war
+    pub device: Option<String>, // name of the iPhone that connected last
     pub pending: Option<Pending>,
     pub device_id: String,
     pub ip: String,
@@ -62,7 +62,7 @@ fn cell() -> &'static Mutex<Shared> {
     })
 }
 
-/// Wann zuletzt Ton angekommen ist (Millisekunden seit Programmstart); daran erkennt die Oberfläche "spielt gerade".
+/// When sound last arrived (milliseconds since program start); the interface uses it to detect "playing".
 static AUDIO_TICK_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 fn now_ms() -> u64 {
@@ -74,19 +74,19 @@ fn now_ms() -> u64 {
         + 10_000
 }
 
-/// Vom Audio-Thread bei jedem Paket aufgerufen.
+/// Called by the audio thread for every packet.
 #[cfg_attr(not(feature = "audio"), allow(dead_code))]
 pub fn mark_audio() {
     AUDIO_TICK_MS.store(now_ms(), std::sync::atomic::Ordering::Relaxed);
 }
 
-/// `true`, wenn in der letzten Sekunde Ton angekommen ist.
+/// `true` if sound arrived within the last second.
 pub fn audio_recent() -> bool {
     let tick = AUDIO_TICK_MS.load(std::sync::atomic::Ordering::Relaxed);
     tick != 0 && now_ms().saturating_sub(tick) < 1200
 }
 
-/// Kurzer Zugriff auf den geteilten Zustand. Nicht verschachteln (sonst Deadlock) und nicht lange halten.
+/// Short access to the shared state. Do not nest (deadlock) and do not hold it for long.
 pub fn with<R>(f: impl FnOnce(&mut Shared) -> R) -> R {
     f(&mut cell().lock().unwrap_or_else(|e| e.into_inner()))
 }
@@ -95,7 +95,7 @@ pub fn settings() -> Settings {
     with(|s| s.settings.clone())
 }
 
-/// Weckt die Oberfläche auf (aus jedem Thread).
+/// Wakes the interface (from any thread).
 pub fn wake() {
     let ctx = with(|s| s.ctx.clone());
     if let Some(ctx) = ctx {
@@ -111,7 +111,7 @@ pub fn set_net(tx: Sender<NetCmd>) {
     with(|s| s.net = Some(tx));
 }
 
-/// Schreibt eine Zeile ins Log (Konsole + Log-Ansicht). Benutzt über das Makro `log!`.
+/// Writes a line to the log (console + log view). Used through the `log!` macro.
 pub fn log(line: String) {
     println!("{line}");
     with(|s| {
@@ -122,7 +122,7 @@ pub fn log(line: String) {
     });
 }
 
-/// Übernimmt neue Einstellungen: speichern und, falls nötig, den Netzwerk-Thread informieren.
+/// Applies new settings: save them and, if necessary, inform the network thread.
 pub fn apply_settings(mut new: Settings) {
     new.name = Settings::clean_name(&new.name);
     let (rename, net) = with(|s| {
@@ -142,8 +142,8 @@ pub fn apply_settings(mut new: Settings) {
     }
 }
 
-/// Wird vom Netzwerk-Thread aufgerufen, wenn ein iPhone spiegeln will. Blockiert, bis entschieden ist.
-/// Gibt `true` zurück, wenn die Verbindung erlaubt ist.
+/// Called by the network thread when an iPhone wants to mirror. Blocks until a decision is made.
+/// Returns `true` if the connection is allowed.
 pub fn approve(id: &str, name: &str, ip: &str) -> bool {
     with(|s| s.device = Some(name.to_string()));
     let (rx, ok) = with(|s| {
@@ -151,7 +151,7 @@ pub fn approve(id: &str, name: &str, ip: &str) -> bool {
             return (None, true);
         }
         if s.settings.trusted_only || s.pending.is_some() {
-            return (None, false); // unbekannt und nur Vertraute erlaubt, oder es wartet schon eine andere Anfrage
+            return (None, false); // unknown and only trusted devices allowed, or another request is already waiting
         }
         if !s.settings.require_confirm {
             return (None, true);
@@ -183,7 +183,7 @@ pub fn approve(id: &str, name: &str, ip: &str) -> bool {
     decision != Decision::Deny
 }
 
-/// Antwort der Oberfläche auf die wartende Anfrage.
+/// The interface's answer to the waiting request.
 pub fn answer(decision: Decision) {
     let pending = with(|s| s.pending.take());
     let Some(p) = pending else { return };
@@ -206,7 +206,7 @@ pub fn answer(decision: Decision) {
     let _ = p.reply.send(decision);
 }
 
-/// Die vom Betriebssystem bevorzugte lokale IPv4-Adresse (es wird dabei nichts gesendet).
+/// The local IPv4 address preferred by the operating system (nothing is sent in the process).
 pub fn local_ip() -> String {
     std::net::UdpSocket::bind("0.0.0.0:0")
         .and_then(|s| {

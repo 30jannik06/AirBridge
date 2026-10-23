@@ -1,5 +1,5 @@
-// H.264-Decoder auf Basis von Windows Media Foundation (in Windows eingebaut, keine DLL nötig).
-// Eingabe: Annex-B-Daten (Startcodes) pro Bild. Ausgabe: fertige Bilder als 0x00RRGGBB-Pixel.
+// H.264 decoder based on Windows Media Foundation (built into Windows, no DLL needed).
+// Input: Annex B data (start codes) per picture. Output: finished pictures as 0x00RRGGBB pixels.
 use anyhow::{Result, anyhow, bail};
 use std::mem::ManuallyDrop;
 use std::sync::mpsc::Receiver;
@@ -11,16 +11,16 @@ use windows::Win32::System::Com::{
     CLSCTX_INPROC_SERVER, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx,
 };
 
-/// Was der Decoder-Thread dem Fenster mitteilt: ein neues Bild oder "Stream beendet".
+/// What the decoder thread tells the window: a new picture or "stream ended".
 pub enum Update {
     Frame(Frame),
     Cleared,
 }
 
-/// Briefkasten für das Fenster. Es zeigt immer nur das NEUESTE Bild (alte werden überschrieben).
+/// Mailbox for the window. It always shows only the LATEST picture (older ones are overwritten).
 pub type Latest = Arc<Mutex<Option<Update>>>;
 
-/// Startet den Decoder-Thread. Leere Daten (`Vec::new()`) bedeuten "Stream zu Ende".
+/// Starts the decoder thread. Empty data (`Vec::new()`) means "end of stream".
 pub fn spawn(rx: Receiver<(Instant, Vec<u8>)>, latest: Latest, wake: impl Fn() + Send + 'static) {
     thread::spawn(move || {
         let mut decoder = match H264Decoder::new() {
@@ -28,14 +28,14 @@ pub fn spawn(rx: Receiver<(Instant, Vec<u8>)>, latest: Latest, wake: impl Fn() +
             Err(e) => return log!("[Decoder] Start fehlgeschlagen: {e:#}"),
         };
         let mut errors = 0u32;
-        // Messwerte: wie lange dauert es von "Paket angekommen" bis "Bild fertig dekodiert"?
+        // Measurements: how long from "packet arrived" to "picture fully decoded"?
         let (mut n_in, mut n_out) = (0u32, 0u32);
         let (mut sum_ms, mut max_ms) = (0.0f64, 0.0f64);
         for (arrived, data) in rx {
             if data.is_empty() {
                 *latest.lock().unwrap() = Some(Update::Cleared);
                 wake();
-                // Für den nächsten Stream mit frischem Zustand starten.
+                // Start with a fresh state for the next stream.
                 match H264Decoder::new() {
                     Ok(d) => decoder = d,
                     Err(e) => return log!("[Decoder] Neustart fehlgeschlagen: {e:#}"),
@@ -80,25 +80,25 @@ pub fn spawn(rx: Receiver<(Instant, Vec<u8>)>, latest: Latest, wake: impl Fn() +
 pub struct Frame {
     pub width: usize,
     pub height: usize,
-    pub pixels: Vec<u32>, // 0x00RRGGBB, wie softbuffer es erwartet
+    pub pixels: Vec<u32>, // 0x00RRGGBB
 }
 
 pub struct H264Decoder {
     transform: IMFTransform,
-    coded_height: usize, // Höhe der Puffer (ggf. auf 16 aufgerundet)
-    stride: usize,       // Bytes pro Zeile im NV12-Puffer
-    disp_w: usize,       // sichtbare Größe (ohne Padding)
+    coded_height: usize, // height of the buffers (possibly rounded up to 16)
+    stride: usize,       // bytes per row in the NV12 buffer
+    disp_w: usize,       // visible size (without padding)
     disp_h: usize,
     out_size: u32,
     provides_samples: bool,
     time: i64,
 }
 
-// SAFETY: Der Decoder wird nur in genau einem Thread benutzt (er wird dort erzeugt).
-// `IMFTransform` ist nicht automatisch `Send`; wir verschieben ihn nie zwischen Threads.
+// SAFETY: The decoder is only used in exactly one thread (it is created there).
+// `IMFTransform` is not automatically `Send`; we never move it between threads.
 
 impl H264Decoder {
-    /// Muss in dem Thread aufgerufen werden, der den Decoder auch benutzt (COM ist thread-gebunden).
+    /// Must be called in the thread that also uses the decoder (COM is bound to a thread).
     pub fn new() -> Result<Self> {
         unsafe {
             CoInitializeEx(None, COINIT_MULTITHREADED).ok()?;
@@ -107,7 +107,7 @@ impl H264Decoder {
             let transform: IMFTransform =
                 CoCreateInstance(&CLSID_MSH264DecoderMFT, None, CLSCTX_INPROC_SERVER)?;
 
-            // Niedrige Latenz bevorzugen (Fehler ignorieren, nicht jede Version kennt das).
+            // Prefer low latency (ignore errors, not every version knows it).
             match transform
                 .GetAttributes()
                 .and_then(|a| a.SetUINT32(&MF_LOW_LATENCY, 1))
@@ -140,7 +140,7 @@ impl H264Decoder {
         }
     }
 
-    /// Wählt NV12 als Ausgabeformat und liest Größe/Stride aus. Wird bei jeder Formatänderung neu aufgerufen.
+    /// Selects NV12 as the output format and reads size/stride. Called again on every format change.
     fn select_output_type(&mut self) -> Result<()> {
         unsafe {
             let mut i = 0;
@@ -160,7 +160,7 @@ impl H264Decoder {
             let size = t.GetUINT64(&MF_MT_FRAME_SIZE).unwrap_or(0);
             let (w, h) = ((size >> 32) as usize, (size & 0xffff_ffff) as usize);
 
-            // Sichtbarer Bereich (der Decoder liefert oft 16er-aufgerundete Größen).
+            // Visible area (the decoder often delivers sizes rounded up to 16).
             let mut area: MFVideoArea = std::mem::zeroed();
             let area_bytes = std::slice::from_raw_parts_mut(
                 &mut area as *mut MFVideoArea as *mut u8,
@@ -197,12 +197,12 @@ impl H264Decoder {
         Ok(())
     }
 
-    /// Dekodiert ein Bild (Annex B). Liefert 0..n fertige Frames.
+    /// Decodes one picture (Annex B). Returns 0..n finished frames.
     pub fn decode(&mut self, data: &[u8]) -> Result<Vec<Frame>> {
         let mut frames = Vec::new();
         if let Err(e) = self.feed(data) {
             if e.code() == MF_E_NOTACCEPTING {
-                // Decoder ist voll: erst Ausgabe abholen, dann nochmal versuchen.
+                // Decoder is full: collect the output first, then try again.
                 self.drain(&mut frames)?;
                 self.feed(data)?;
             } else {
@@ -213,7 +213,7 @@ impl H264Decoder {
         Ok(frames)
     }
 
-    /// Zwingt den Decoder, alle zurückgehaltenen Bilder sofort auszugeben.
+    /// Forces the decoder to output all held-back pictures immediately.
     pub fn flush(&mut self) -> Result<Vec<Frame>> {
         let mut frames = Vec::new();
         unsafe {
@@ -221,7 +221,7 @@ impl H264Decoder {
                 .ProcessMessage(MFT_MESSAGE_COMMAND_DRAIN, 0)?
         };
         self.drain(&mut frames)?;
-        // Nach einem Drain muss der Datenstrom neu "gestartet" werden, sonst kommt nichts mehr heraus.
+        // After a drain the data stream has to be "restarted", otherwise nothing comes out any more.
         unsafe {
             self.transform
                 .ProcessMessage(MFT_MESSAGE_NOTIFY_START_OF_STREAM, 0)?
@@ -241,7 +241,7 @@ impl H264Decoder {
             let sample = MFCreateSample()?;
             sample.AddBuffer(&buffer)?;
             sample.SetSampleTime(self.time)?;
-            sample.SetSampleDuration(333_333)?; // 1/30 s in 100-ns-Einheiten
+            sample.SetSampleDuration(333_333)?; // 1/30 s in 100 ns units
             self.time += 333_333;
             self.transform.ProcessInput(0, &sample, 0)
         }
@@ -270,7 +270,7 @@ impl H264Decoder {
             }];
             let mut status = 0u32;
             let result = unsafe { self.transform.ProcessOutput(0, &mut out, &mut status) };
-            // Besitz zurücknehmen, damit COM-Objekte korrekt freigegeben werden.
+            // Take ownership back so COM objects are released correctly.
             let sample = unsafe { ManuallyDrop::take(&mut out[0].pSample) };
             unsafe { ManuallyDrop::drop(&mut out[0].pEvents) };
 
@@ -288,7 +288,7 @@ impl H264Decoder {
         Ok(())
     }
 
-    /// NV12 (Y-Ebene + gemischte UV-Ebene) -> 0x00RRGGBB (BT.709, "limited range").
+    /// NV12 (Y plane + interleaved UV plane) -> 0x00RRGGBB (BT.709, "limited range").
     fn convert(&self, sample: &IMFSample) -> Result<Frame> {
         unsafe {
             let buffer = sample.ConvertToContiguousBuffer()?;
@@ -347,7 +347,7 @@ mod tests {
 
     #[test]
     fn nv12_black_and_white() {
-        // 2x2 Bild: Y-Ebene (4 Byte) + eine UV-Zeile (2 Byte), Stride 2
+        // 2x2 picture: Y plane (4 bytes) + one UV row (2 bytes), stride 2
         let black = nv12_to_rgb(&[16, 16, 16, 16, 128, 128], 2, 2, 2, 2).unwrap();
         assert!(black.pixels.iter().all(|&p| p == 0x000000));
 
@@ -360,7 +360,7 @@ mod tests {
 
     #[test]
     fn nv12_respects_stride_and_cropping() {
-        // sichtbar 2x2, aber Puffer 4 Byte breit und 4 Zeilen hoch (Padding wie beim Windows-Decoder)
+        // visible 2x2, but the buffer is 4 bytes wide and 4 rows high (padding like the Windows decoder)
         let mut data = vec![16u8; 4 * 4];
         data.extend_from_slice(&[128u8; 4 * 2]);
         let f = nv12_to_rgb(&data, 4, 4, 2, 2).unwrap();

@@ -22,7 +22,7 @@ Please make sure all feature variants compile without warnings (default, `--no-d
 Guidelines:
 
 - Keep it small and readable; the project is also a learning project, comments that explain *why* are welcome.
-- Code comments are currently mostly German; English or German comments are both fine in new code.
+- Code comments are in English. The interface and log messages are in German for now.
 - Add a unit test when you touch parsing, crypto or protocol code (see the existing tests in `pairing.rs`, `sps.rs`, `mirror.rs`).
 - Do not commit key files, captured video or screenshots of real devices.
 

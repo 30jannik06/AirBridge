@@ -1,7 +1,7 @@
-// Fernsteuerung des iPhones (Play/Pause, Weiter, Zurück) über DACP, das alte iTunes-Remote-Protokoll.
-// Das iPhone schickt in jeder RTSP-Anfrage zwei Header: `DACP-ID` und `Active-Remote`. Unter dem Namen
-// `iTunes_Ctrl_<DACP-ID>` kündigt es per mDNS (`_dacp._tcp`) einen kleinen HTTP-Dienst an. An den schicken wir
-// einfache GET-Anfragen wie `/ctrl-int/1/playpause`.
+// Remote control of the iPhone (play/pause, next, previous) via DACP, the old iTunes remote protocol.
+// The iPhone sends two headers in every RTSP request: `DACP-ID` and `Active-Remote`. Under the name
+// `iTunes_Ctrl_<DACP-ID>` it announces a small HTTP service via mDNS (`_dacp._tcp`). We send it
+// simple GET requests like `/ctrl-int/1/playpause`.
 use crate::music::Dacp;
 use crate::shared;
 use anyhow::{Result, anyhow, bail};
@@ -11,7 +11,7 @@ use std::net::{IpAddr, SocketAddr, TcpStream};
 use std::thread;
 use std::time::{Duration, Instant};
 
-/// Befehle, die die Oberfläche schicken kann.
+/// Commands the interface can send.
 #[derive(Clone, Copy, Debug)]
 pub enum Command {
     PlayPause,
@@ -29,7 +29,7 @@ impl Command {
     }
 }
 
-/// Merkt sich die Fernsteuer-Daten aus den RTSP-Headern und sucht (einmal pro Gerät) den passenden Dienst per mDNS.
+/// Remembers the remote control data from the RTSP headers and looks for the matching service via mDNS (once per device).
 pub fn learn(id: &str, remote: &str, peer: Option<IpAddr>) {
     let start_search = shared::with(|s| {
         let same = s
@@ -68,7 +68,7 @@ pub fn learn(id: &str, remote: &str, peer: Option<IpAddr>) {
     }
 }
 
-/// Sucht den Dienst `iTunes_Ctrl_<id>` und gibt Adresse und Port zurück.
+/// Looks for the service `iTunes_Ctrl_<id>` and returns address and port.
 fn find(id: &str, peer: Option<IpAddr>) -> Result<(IpAddr, u16)> {
     let daemon = ServiceDaemon::new()?;
     let events = daemon.browse("_dacp._tcp.local.")?;
@@ -105,7 +105,7 @@ fn find(id: &str, peer: Option<IpAddr>) -> Result<(IpAddr, u16)> {
     result
 }
 
-/// Schickt einen Befehl an das iPhone. Blockiert kurz, darum aus einem eigenen Thread aufrufen.
+/// Sends a command to the iPhone. Blocks briefly, so call it from its own thread.
 pub fn send(command: Command) -> Result<()> {
     let dacp = shared::with(|s| s.music.dacp.clone())
         .ok_or_else(|| anyhow!("keine Fernsteuerung bekannt"))?;

@@ -3,9 +3,9 @@ use crate::identity::{Identity, hex};
 use anyhow::Result;
 use mdns_sd::{ServiceDaemon, ServiceInfo};
 
-// `&str` = geliehener Text (nur lesen), `String` = besitzt seinen Text.
+// `&str` = borrowed text (read only), `String` = owns its text.
 pub fn announce(id: &Identity, name: &str) -> Result<ServiceDaemon> {
-    let daemon = ServiceDaemon::new()?; // `?` = bei Fehler sofort zurückgeben
+    let daemon = ServiceDaemon::new()?; // `?` = return immediately on error
     let host = "airbridge.local.";
     let pk = hex(&id.public());
     let device_id = id.device_id();
@@ -22,7 +22,7 @@ pub fn announce(id: &Identity, name: &str) -> Result<ServiceDaemon> {
         ("pi", pi.as_str()),
         ("vv", "2"),
     ];
-    // IP leer + enable_addr_auto(): die Library trägt alle lokalen IPs selbst ein.
+    // Empty IP + enable_addr_auto(): the library fills in all local IPs itself.
     let airplay = ServiceInfo::new(
         "_airplay._tcp.local.",
         name,
@@ -34,7 +34,7 @@ pub fn announce(id: &Identity, name: &str) -> Result<ServiceDaemon> {
     .enable_addr_auto();
     daemon.register(airplay)?;
 
-    // --- _raop._tcp --- Instanzname MUSS "<MAC ohne Doppelpunkte>@<Name>" sein.
+    // --- _raop._tcp --- The instance name MUST be "<MAC without colons>@<name>".
     let raop_name = format!("{}@{}", device_id.replace(':', ""), name);
     let raop_txt = [
         ("txtvers", "1"),
