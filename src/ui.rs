@@ -399,10 +399,17 @@ impl App {
         if let Some(e) = net_error {
             ui.colored_label(Color32::LIGHT_RED, format!("Netzwerkfehler: {e}"));
         }
+        let music = shared::with(|s| s.music.clone());
+        let listening = shared::audio_recent() || music.has_track();
         let (color, text) = if self.connected {
             (
                 Color32::from_rgb(80, 200, 120),
                 format!("Verbunden mit {}", device.as_deref().unwrap_or("iPhone")),
+            )
+        } else if listening {
+            (
+                Color32::from_rgb(80, 200, 120),
+                format!("Musik von {}", device.as_deref().unwrap_or("iPhone")),
             )
         } else {
             (
@@ -433,6 +440,14 @@ impl App {
                         config::MIRROR_PORT
                     ),
                 );
+                if !self.connected && music.has_track() {
+                    let now = if music.artist.is_empty() {
+                        music.title.clone()
+                    } else {
+                        format!("{} – {}", music.title, music.artist)
+                    };
+                    row(ui, "Läuft gerade", &now);
+                }
                 if self.connected {
                     row(
                         ui,
