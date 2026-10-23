@@ -35,10 +35,11 @@ jobs:
       - name: Prüfsummen
         shell: pwsh
         run: |
-          Get-ChildItem dist -File | ForEach-Object {
+          $lines = @(Get-ChildItem dist -File | ForEach-Object {
             $h = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
             "$h  $($_.Name)"
-          } | Out-File dist\SHA256SUMS.txt -Encoding ascii
+          })
+          $lines | Out-File dist\SHA256SUMS.txt -Encoding ascii
 
       - name: Release veröffentlichen
         uses: softprops/action-gh-release@v2
