@@ -8,7 +8,8 @@ Mirror your iPhone from Control Center → Screen Mirroring to a Windows PC. No 
 
 🇩🇪 [Deutsche Version](README.de.md)
 
-- **One small executable** (about 2 MB), no runtime dependencies.
+- **One small executable** (about 7 MB), no runtime dependencies.
+- **Friendly interface:** status, settings, live log, tray icon, optional "allow this device?" prompt.
 - **Low latency video:** H.264 decoded by the decoder built into Windows (Media Foundation), plus a window with fullscreen.
 - **Audio** (optional, build-time feature): AAC-ELD via FDK-AAC, played on your default speakers.
 - **Installer or portable:** both are provided on the releases page.
@@ -51,6 +52,14 @@ Download from the [Releases](https://github.com/30jannik06/AirBridge/releases) p
 | Close window | Quit |
 
 The window follows the picture size (e.g. when you rotate the phone).
+
+### Settings
+
+The left panel has three tabs: **Status** (connection, address, resolution, latency), **Settings** and **Log**.
+In *Settings* you can change the device name shown on the iPhone, keep the window on top, go fullscreen automatically,
+start with Windows (in the tray), keep running in the tray when the window is closed, and require a confirmation before
+a new device may connect ("Allow once / Always / Deny"). Settings are stored in `settings.json` next to the key file.
+Start with `--minimized` to begin in the tray.
 
 ### Firewall rule
 

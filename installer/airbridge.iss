@@ -51,4 +51,5 @@ Filename: "netsh"; Parameters: "advfirewall firewall add rule name=""AirBridge""
 Filename: "{app}\airbridge.exe"; Description: "{cm:LaunchProgram,AirBridge}"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
+Filename: "reg"; Parameters: "delete HKCU\Software\Microsoft\Windows\CurrentVersion\Run /v AirBridge /f"; Flags: runhidden; RunOnceId: "RemoveAutostart"
 Filename: "netsh"; Parameters: "advfirewall firewall delete rule name=""AirBridge"""; Flags: runhidden; RunOnceId: "RemoveFirewallRule"

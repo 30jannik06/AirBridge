@@ -8,7 +8,8 @@ Du spiegelst dein iPhone über Kontrollzentrum → Bildschirmsynchronisierung au
 
 🇬🇧 [English version](README.md)
 
-- **Eine kleine Datei** (ca. 2 MB), keine Laufzeit-Abhängigkeiten.
+- **Eine kleine Datei** (ca. 7 MB), keine Laufzeit-Abhängigkeiten.
+- **Schöne Oberfläche:** Status, Einstellungen, Live-Log, Tray-Symbol, optionale Bestätigung neuer Geräte.
 - **Wenig Verzögerung:** H.264 über den in Windows eingebauten Decoder (Media Foundation), Fenster mit Vollbild.
 - **Ton** (optional, beim Bauen wählbar): AAC-ELD über FDK-AAC, Ausgabe auf den Standard-Lautsprechern.
 - **Setup oder portabel:** beides gibt es auf der Releases-Seite.
@@ -49,6 +50,14 @@ Download auf der [Releases](https://github.com/30jannik06/AirBridge/releases)-Se
 | `F11` oder Doppelklick | Vollbild an/aus |
 | `Esc` | Vollbild verlassen |
 | Fenster schließen | Beenden |
+
+### Einstellungen
+
+Das linke Panel hat drei Reiter: **Status** (Verbindung, Adresse, Auflösung, Verzögerung), **Einstellungen** und **Log**.
+In den *Einstellungen* änderst du den Gerätenamen auf dem iPhone, hältst das Fenster im Vordergrund, startest
+automatisch im Vollbild, startest mit Windows (im Tray), lässt AirBridge beim Schließen im Tray weiterlaufen und
+verlangst eine Bestätigung, bevor sich ein neues Gerät verbinden darf („Zulassen / Immer / Ablehnen“). Die Werte liegen in
+`settings.json` neben dem Schlüssel. Mit `--minimized` startet AirBridge nur im Tray.
 
 ### Firewall-Regel
 

@@ -13,14 +13,15 @@ iPhone ──UDP───────▶ audio ─▶ FDK-AAC ─▶ playback   
 
 | Thread | Job |
 |---|---|
-| main | winit event loop: window, drawing, input. Must be the main thread on Windows. |
-| network | `run_network()`: mDNS announcement, then blocks in the RTSP accept loop (one thread per connection). |
+| main | eframe/egui event loop: window, drawing, input, tray icon. Must be the main thread on Windows. |
+| network | `run_network()`: mDNS announcement, then waits for commands from the UI (rename). |
+| rtsp | Accept loop on port 7000, one thread per connection. |
 | mirror | Accepts the video TCP connection on port 7100, decrypts, forwards NAL units. |
 | decoder | Receives NAL units over a bounded channel, decodes via Media Foundation, publishes the newest frame. |
 | ntp | Sends NTP requests to the iPhone's timing port while a session is alive. |
 | audio / playback | (feature `nonfree-audio`) receives RTP, decrypts, decodes, resamples, plays via cpal. |
 
-The decoder publishes into a single-slot `Latest` mailbox and wakes the window with an event-loop proxy.
+The decoder publishes into a single-slot `Latest` mailbox and wakes the window through the egui context (`shared::wake`).
 If the window is slow, frames are dropped instead of queued: latency stays low.
 
 ## Modules
@@ -38,9 +39,12 @@ If the window is slow, frames are dropped instead of queued: latency stays low.
 | `mirror.rs` | Video channel: 128-byte header, AES-CTR, AVCC → Annex B |
 | `sps.rs` | Rewrites the SPS so the decoder does not buffer frames |
 | `decoder.rs` | Media Foundation H.264 decoder, NV12 → RGB |
-| `window.rs` | winit window, softbuffer drawing, bilinear scaling, fullscreen |
+| `ui.rs` | egui interface: video view, side panel (status, settings, log), approval dialog, fullscreen |
+| `tray.rs` | Tray icon and menu (tray-icon) |
+| `settings.rs` | `settings.json`: name, window and system options, trusted devices |
+| `shared.rs` | Global state shared by network threads and UI: log, settings, pending approval |
 | `audio.rs`, `playback.rs` | (feature `nonfree-audio`) audio pipeline |
-| `platform.rs` | Windows helpers: hide console, message boxes, firewall rule |
+| `platform.rs` | Windows helpers: hide console, message boxes, firewall rule, autostart |
 | `icon.rs` | Window icon, drawn at runtime |
 | `selftest.rs` | Offline decoder test (`--decode-file`) |
 

@@ -23,7 +23,7 @@ cargo test                                    # unit tests
 cargo fmt --check                             # formatting
 ```
 
-Result: `target\release\airbridge.exe` (about 2 MB without audio). The first build is slower because the C code (playfair)
+Result: `target\release\airbridge.exe` (about 7 MB without audio). The first build is slower because the C code (playfair)
 and, with audio, the C++ code (FDK-AAC) are compiled too.
 
 For development with log output, run from a terminal: `cargo run --release`. When started by double click the

@@ -7,7 +7,7 @@ Ideas, roughly by value. Nothing here is promised.
 - **Executable icon** (embedded resource) instead of only the window icon.
 - **Better scaling / GPU rendering** (today: software bilinear scaling).
 - **Multiple devices / reconnect polish.**
-- **Optional PIN** to restrict who may connect.
+- **Real PIN pairing** (the current "allow this device?" prompt is a confirmation, not a PIN).
 - **Linux support.** The protocol layer (mDNS, RTSP, pairing, FairPlay, mirror channel) is portable Rust and C. What is
   Windows specific: the H.264 decoder (Media Foundation), a few platform helpers, and the installer. A Linux port needs
   a different decoder (e.g. GStreamer or FFmpeg) and packaging. Note that [UxPlay](https://github.com/FDH2/UxPlay)
