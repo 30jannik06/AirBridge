@@ -15,7 +15,7 @@ jobs:
           components: rustfmt
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --check
-      - name: Build (default: video and music)
+      - name: "Build (default: video and music)"
         run: cargo build --release
       - name: Build (no audio)
         run: cargo build --release --no-default-features
