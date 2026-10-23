@@ -1,0 +1,51 @@
+name: Release
+
+# Wird durch ein Tag wie v0.1.0 ausgelöst. Die Programme werden OHNE Ton gebaut (FDK-AAC ist nicht GPL-kompatibel).
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Version aus dem Tag
+        shell: pwsh
+        run: '"VERSION=$($env:GITHUB_REF_NAME.TrimStart(''v''))" >> $env:GITHUB_ENV'
+
+      - name: Build und portable ZIP
+        shell: pwsh
+        run: .\scripts\package.ps1 -Version $env:VERSION
+
+      - name: Inno Setup installieren
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Installer bauen
+        shell: pwsh
+        run: '& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$env:VERSION" installer\airbridge.iss'
+
+      - name: Prüfsummen
+        shell: pwsh
+        run: |
+          Get-ChildItem dist -File | ForEach-Object {
+            $h = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+            "$h  $($_.Name)"
+          } | Out-File dist\SHA256SUMS.txt -Encoding ascii
+
+      - name: Release veröffentlichen
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          files: |
+            dist/*.zip
+            dist/*.exe
+            dist/SHA256SUMS.txt

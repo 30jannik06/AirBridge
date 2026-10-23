@@ -1,0 +1,51 @@
+[package]
+name = "airbridge"
+version = "0.1.0"
+edition = "2024"
+description = "Lean AirPlay screen-mirroring receiver for Windows"
+license = "GPL-3.0-only"
+repository = "https://github.com/30jannik06/AirBridge"
+readme = "README.md"
+keywords = ["airplay", "screen-mirroring", "windows", "ios", "receiver"]
+categories = ["multimedia::video", "network-programming"]
+publish = false
+
+[features]
+# Sound (AAC-ELD via FDK-AAC + playback via cpal). On by default for source builds.
+# The prebuilt releases are built WITHOUT it (--no-default-features), because the FDK-AAC license
+# is not compatible with the GPL when distributing binaries. See THIRD_PARTY_NOTICES.md.
+default = ["audio"]
+audio = ["dep:fdk-aac", "dep:cpal", "dep:cbc"]
+
+[dependencies]
+aes = "0.9.3"
+anyhow = "1.0.104"
+cbc = { version = "0.2.1", optional = true }
+cpal = { version = "0.18.2", optional = true }
+ctr = "0.10.1"
+ed25519-dalek = "3.0.0"
+fdk-aac = { version = "0.8.0", optional = true }
+getrandom = "0.4.3"
+mdns-sd = "0.21.6"
+plist = "1.10.3"
+sha2 = "0.11.1"
+softbuffer = "0.4.8"
+windows = { version = "0.62.2", features = [
+    "Win32_Media_MediaFoundation",
+    "Win32_System_Com",
+    "Win32_Foundation",
+    "Win32_System_Console",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
+winit = "0.30.13"
+x25519-dalek = "3.0.0"
+
+[build-dependencies]
+cc = "1.9.0"
+
+[profile.release]
+lto = true         # smaller and faster binary
+codegen-units = 1
+strip = true
+panic = "unwind"   # the panic hook shows a dialog, so keep unwinding

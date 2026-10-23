@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --check
+      - name: Build (video only)
+        run: cargo build --release --no-default-features
+      - name: Build (with audio)
+        run: cargo build --release
+      - name: Tests
+        run: cargo test

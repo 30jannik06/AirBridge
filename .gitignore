@@ -1,0 +1,14 @@
+# Build-Ausgaben
+/target
+
+# PRIVATER Schlüssel des Receivers: niemals einchecken oder weitergeben
+airbridge_key.bin
+
+# Testdateien (enthalten Bildschirminhalte vom iPhone)
+*.h264
+*.ppm
+frame*.png
+t_*.png
+icon_preview.png
+dist/
+.claude/
