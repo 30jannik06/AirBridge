@@ -13,6 +13,7 @@ use std::time::{Duration, Instant};
 
 const ACCENT: Color32 = Color32::from_rgb(64, 156, 255);
 const OVERLAY_SECONDS: f32 = 2.5;
+const HOME_SIZE: [f32; 2] = [780.0, 640.0]; // Fenstergröße ohne Bild: Panel + Hinweis passen nebeneinander
 
 #[derive(PartialEq, Clone, Copy)]
 enum Tab {
@@ -48,8 +49,8 @@ pub fn run(latest: Latest, start_hidden: bool) -> eframe::Result {
     };
     let mut viewport = egui::ViewportBuilder::default()
         .with_title("AirBridge")
-        .with_inner_size([420.0, 720.0])
-        .with_min_inner_size([360.0, 420.0])
+        .with_inner_size(HOME_SIZE)
+        .with_min_inner_size([640.0, 460.0])
         .with_icon(icon);
     if settings.always_on_top {
         viewport = viewport.with_always_on_top();
@@ -150,7 +151,10 @@ impl eframe::App for App {
                     self.set_fullscreen(ctx, false);
                     self.auto_fullscreen = false;
                 }
-                ctx.send_viewport_cmd(ViewportCommand::InnerSize(egui::vec2(420.0, 720.0)));
+                ctx.send_viewport_cmd(ViewportCommand::InnerSize(egui::vec2(
+                    HOME_SIZE[0],
+                    HOME_SIZE[1],
+                )));
             }
             None => {}
         }
@@ -268,18 +272,16 @@ impl App {
         // Noch kein Bild: Hinweis, wie man verbindet.
         ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
             ui.vertical_centered(|ui| {
-                ui.add_space(rect.height() * 0.28);
-                ui.label(RichText::new("📺").size(56.0));
-                ui.add_space(6.0);
+                ui.add_space(rect.height() * 0.32);
                 ui.label(RichText::new("Warte auf iPhone …").size(26.0).strong());
                 ui.add_space(14.0);
                 ui.label("Auf dem iPhone:");
                 ui.label(
-                    RichText::new("Kontrollzentrum → Bildschirmsynchronisierung")
+                    RichText::new("Kontrollzentrum > Bildschirmsynchronisierung")
                         .color(Color32::LIGHT_GRAY),
                 );
                 let name = shared::with(|s| s.settings.name.clone());
-                ui.label(RichText::new(format!("→ {name}")).color(ACCENT).strong());
+                ui.label(RichText::new(format!("> {name}")).color(ACCENT).strong());
                 if !self.show_panel {
                     ui.add_space(10.0);
                     if ui.button("Menü öffnen").clicked() {
@@ -389,7 +391,8 @@ impl App {
             )
         };
         ui.horizontal(|ui| {
-            ui.colored_label(color, "●");
+            let (dot, _) = ui.allocate_exact_size(egui::vec2(14.0, 14.0), egui::Sense::hover());
+            ui.painter().circle_filled(dot.center(), 5.5, color);
             ui.label(RichText::new(text).strong());
         });
         ui.add_space(6.0);
