@@ -15,6 +15,12 @@ Du spiegelst dein iPhone über Kontrollzentrum → Bildschirmsynchronisierung au
 - **Ton beim Spiegeln** (optional, beim Bauen wählbar): AAC-ELD über FDK-AAC, siehe Hinweis unten.
 - **Setup oder portabel:** beides gibt es auf der Releases-Seite.
 
+## Screenshots
+
+| Wartend | Einstellungen |
+|---|---|
+| ![AirBridge wartet auf ein iPhone](docs/img/status.png) | ![AirBridge Einstellungen](docs/img/settings.png) |
+
 ## Status
 
 Getestet mit einem iPhone unter Windows 11. Funktioniert: Erkennung, Pairing, Bild, Musik, Drehen, Vollbild, Einstellungen, Tray. Ton beim Spiegeln gibt es in selbst gebauten Versionen.

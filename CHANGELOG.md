@@ -4,6 +4,16 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-23
+
+### Added
+- The executable now has an icon and version information (Explorer, taskbar, file properties); the installer uses it too.
+- Screenshots in the README.
+- Requests AirBridge does not know yet (for example AirPlay video by link) are written to the log with their content.
+
+### Changed
+- All code comments are in English.
+
 ## [0.3.0] - 2026-10-23
 
 ### Added

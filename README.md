@@ -15,6 +15,12 @@ Mirror your iPhone from Control Center → Screen Mirroring to a Windows PC. No 
 - **Sound while mirroring** (optional, build-time feature): AAC-ELD via FDK-AAC, see the note below.
 - **Installer or portable:** both are provided on the releases page.
 
+## Screenshots
+
+| Waiting | Settings |
+|---|---|
+| ![AirBridge waiting for an iPhone](docs/img/status.png) | ![AirBridge settings](docs/img/settings.png) |
+
 ## Status
 
 Tested with an iPhone on Windows 11. Working: discovery, pairing, video, music, rotation, fullscreen, settings, tray. Sound while mirroring works in self-built versions.
