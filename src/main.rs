@@ -34,6 +34,7 @@ mod sps;
 mod stream;
 mod tray;
 mod ui;
+mod updater;
 
 use anyhow::Result; // `Result<T>` with any error; `?` passes errors upwards
 use shared::NetCmd;
@@ -88,6 +89,19 @@ fn main() -> Result<()> {
     // `--minimized` (autostart): start in the tray only, but only if the tray behaviour is enabled.
     let start_hidden =
         args.iter().any(|a| a == "--minimized") && shared::settings().minimize_to_tray;
+
+    // Only one AirBridge at a time (the ports would clash anyway); the installer uses the same name to find a running copy.
+    if platform::already_running() {
+        platform::message(
+            "AirBridge",
+            "AirBridge läuft bereits (siehe Taskleiste oder Tray).",
+            false,
+        );
+        return Ok(());
+    }
+    if shared::settings().check_updates {
+        updater::spawn_check();
+    }
 
     // The window MUST run on the main thread. Network and decoder run in their own threads.
     let latest: decoder::Latest = Arc::new(Mutex::new(None));

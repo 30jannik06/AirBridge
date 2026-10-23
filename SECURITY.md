@@ -13,4 +13,5 @@ Include steps to reproduce and the affected version. You can expect a first repl
 - The private key file `airbridge_key.bin` identifies the receiver. Anyone with it can impersonate your receiver.
 - The network parsers (RTSP, plist, video/audio framing) handle untrusted input. Reports of crashes, hangs or memory
   safety problems (`unsafe` code, the C code in `vendor/`) are especially welcome.
-- AirBridge does not connect to the internet.
+- AirBridge does not connect to the internet, except for the optional update check (off by default): one HTTPS request to
+  `api.github.com`. It only reads the latest version number and a link to our own release page; it never downloads or runs anything.

@@ -59,6 +59,13 @@ Download auf der [Releases](https://github.com/30jannik06/AirBridge/releases)-Se
 | `Esc` | Vollbild verlassen |
 | Fenster schließen | Beenden |
 
+### Updates
+
+AirBridge kann dir melden, wenn eine neue Version erschienen ist (standardmäßig aus, siehe *Sicherheit und Datenschutz*).
+Es weist nur auf die Release-Seite hin, es wird nichts automatisch installiert. **Installiert:** das neue Setup ausführen,
+es schließt AirBridge bei Bedarf und ersetzt die alte Version; deine Einstellungen bleiben. **Portabel:** das neue ZIP
+über den alten Ordner entpacken; Schlüssel und Einstellungen bleiben.
+
 ### Musik
 
 Spiele auf dem iPhone Musik (oder ein Video) ab und wähle mit dem AirPlay-Symbol **AirBridge**. Das Fenster zeigt Cover,
@@ -114,7 +121,7 @@ Voraussetzungen und Hinweise zu Virenscanner/EDR: [docs/BUILDING.md](docs/BUILDI
 ## Sicherheit und Datenschutz
 
 - AirBridge hört im lokalen Netzwerk und hat **keine PIN/kein Passwort**: Jedes Gerät im selben Netzwerk kann sich verbinden. Nur in vertrauenswürdigen Netzwerken betreiben.
-- Das Programm sendet nichts ins Internet.
+- Standardmäßig verbindet sich AirBridge nie mit dem Internet. Einzige Ausnahme ist der optionale Update-Check („Beim Start nach Updates suchen“, standardmäßig aus, oder der Knopf „Jetzt nach Updates suchen“): Er schickt eine normale HTTPS-Anfrage an die GitHub-API und überträgt keine Daten über dich.
 - Der private Schlüssel (`airbridge_key.bin`) liegt in `%APPDATA%\AirBridge` (installiert) bzw. neben der Exe (portabel). Nicht weitergeben.
 
 ## Lizenz

@@ -61,6 +61,12 @@ Download from the [Releases](https://github.com/30jannik06/AirBridge/releases) p
 
 The window follows the picture size (e.g. when you rotate the phone).
 
+### Updates
+
+AirBridge can tell you when a new version is out (off by default, see *Security and privacy*). It only points you to the
+release page, nothing is installed automatically. **Installed:** run the new Setup, it closes AirBridge if needed and
+replaces the old version; your settings stay. **Portable:** unzip the new ZIP over the old folder; key and settings stay.
+
 ### Music
 
 Play music (or a video) on the iPhone and pick **AirBridge** with the AirPlay button. The window shows cover, title, artist,
@@ -71,7 +77,7 @@ control, the play/pause/previous/next buttons work too; otherwise control the mu
 
 The left panel has three tabs: **Status** (connection, address, resolution, latency), **Settings** and **Log**.
 In *Settings* you can change the device name shown on the iPhone, keep the window on top, go fullscreen automatically,
-start with Windows (in the tray), keep running in the tray when the window is closed, and require a confirmation before
+start with Windows (in the tray), keep running in the tray when the window is closed, check for updates, and require a confirmation before
 a new device may connect ("Allow once / Always / Deny"). Settings are stored in `settings.json` next to the key file.
 Start with `--minimized` to begin in the tray.
 
@@ -116,7 +122,7 @@ Prerequisites and EDR/antivirus hints: [docs/BUILDING.md](docs/BUILDING.md).
 ## Security and privacy
 
 - AirBridge listens on the local network and has **no PIN or password**: any device on the same network can connect. Use it on networks you trust.
-- It never contacts the internet.
+- By default it never contacts the internet. The only exception is the optional update check (Settings → "Check for updates at startup" is off by default, or the button "Jetzt nach Updates suchen"): it sends one normal HTTPS request to the GitHub API and sends no data about you.
 - The receiver's private key (`airbridge_key.bin`) lives in `%APPDATA%\AirBridge` (installed) or next to the exe (portable). Do not share it.
 
 ## Licence

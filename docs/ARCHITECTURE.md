@@ -47,6 +47,7 @@ If the window is slow, frames are dropped instead of queued: latency stays low.
 | `audio.rs`, `playback.rs` | (feature `audio`) audio pipeline: ALAC decoder, optional AAC-ELD, volume, sample ring for the spectrum |
 | `music.rs` | "Now playing" state: DMAP metadata, cover, progress, volume from `SET_PARAMETER` |
 | `spectrum.rs` | FFT and 32 logarithmic bands for the visualiser |
+| `updater.rs` | Optional update check: WinHTTP GET to the GitHub API, version comparison, notice in the UI |
 | `dacp.rs` | Remote control of the iPhone (play/pause/next/previous) via DACP over mDNS + HTTP |
 | `platform.rs` | Windows helpers: hide console, message boxes, firewall rule, autostart |
 | `icon.rs` | Window icon, drawn at runtime |

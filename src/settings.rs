@@ -28,6 +28,8 @@ pub struct Settings {
     pub always_on_top: bool,
     /// Switch to fullscreen automatically as soon as an iPhone mirrors.
     pub start_fullscreen: bool,
+    /// Look for a newer version on GitHub at startup (sends one request; off by default).
+    pub check_updates: bool,
     /// Ask before every new connection.
     pub require_confirm: bool,
     /// Reject unknown devices silently (no dialog); only trusted devices may mirror.
@@ -43,6 +45,7 @@ impl Default for Settings {
             minimize_to_tray: false,
             always_on_top: false,
             start_fullscreen: false,
+            check_updates: false,
             require_confirm: false,
             trusted_only: false,
             trusted: Vec::new(),
@@ -124,6 +127,7 @@ mod tests {
         assert!(s.autostart);
         assert!(!s.require_confirm);
         assert!(!s.trusted_only);
+        assert!(!s.check_updates);
         assert!(s.trusted.is_empty());
     }
 

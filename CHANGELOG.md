@@ -4,6 +4,18 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-23
+
+### Added
+- **Update check:** optional (off by default). "Check for updates at startup" in the settings and a "check now" button.
+  If a newer version exists, a notice points to the release page (nothing is downloaded or installed automatically).
+  Uses WinHTTP (built into Windows); only links to our own repository are ever opened.
+- **Single instance:** a second AirBridge no longer starts (it shows a hint instead of a port error).
+- The installer now closes a running AirBridge before replacing the files, so installing over an old version works.
+
+### Changed
+- README and SECURITY describe the update check as the only (optional) network access to the internet.
+
 ## [0.3.1] - 2026-10-23
 
 ### Added

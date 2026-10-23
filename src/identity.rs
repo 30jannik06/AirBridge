@@ -24,6 +24,14 @@ pub struct Identity {
 /// Where the key lives:
 /// - **Portable version** (file `portable.txt` next to the exe): key next to the exe, everything stays in one folder.
 /// - **Installed version** (normal case): `%APPDATA%\AirBridge`, because you may not write under "Program Files".
+/// `true` if `portable.txt` lies next to the exe (portable version: everything stays in one folder).
+pub fn is_portable() -> bool {
+    std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|dir| dir.join("portable.txt").exists()))
+        .unwrap_or(false)
+}
+
 pub fn key_path() -> PathBuf {
     let exe_dir = std::env::current_exe()
         .ok()

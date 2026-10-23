@@ -2,10 +2,12 @@
 // As soon as an iPhone mirrors, the panel is hidden and the picture fills the window.
 use crate::dacp::{self, Command};
 use crate::decoder::{Latest, Update};
+use crate::identity;
 use crate::settings::Settings;
 use crate::shared::{self, Decision};
 use crate::spectrum;
 use crate::tray::{self, Tray, TrayAction};
+use crate::updater::{self, UpdateState};
 use crate::{config, platform};
 use eframe::egui::{
     self, Align2, Color32, ColorImage, Key, Panel, RichText, TextureHandle, TextureOptions,
@@ -375,6 +377,7 @@ impl App {
             ui.selectable_value(&mut self.tab, Tab::Log, "Log");
         });
         ui.separator();
+        self.update_banner(ui);
         egui::ScrollArea::vertical()
             .auto_shrink([false, false])
             .show(ui, |ui| match self.tab {
@@ -382,6 +385,32 @@ impl App {
                 Tab::Settings => self.settings_tab(ui),
                 Tab::Log => log_tab(ui),
             });
+    }
+
+    /// Notice at the top of the panel when a newer version exists. We only point to the release page.
+    fn update_banner(&self, ui: &mut egui::Ui) {
+        let UpdateState::Available(release) = shared::with(|s| s.update.clone()) else {
+            return;
+        };
+        let how = if identity::is_portable() {
+            "Neues ZIP herunterladen und über den alten Ordner entpacken. Schlüssel und Einstellungen bleiben erhalten."
+        } else {
+            "Setup herunterladen und ausführen. Es ersetzt die alte Version, deine Einstellungen bleiben erhalten."
+        };
+        egui::Frame::group(ui.style())
+            .fill(Color32::from_rgb(28, 48, 76))
+            .show(ui, |ui| {
+                ui.label(
+                    RichText::new(format!("Neue Version {} verfügbar", release.version)).strong(),
+                );
+                ui.label(RichText::new(how).small());
+                if ui.button("Release-Seite öffnen").clicked()
+                    && updater::is_release_url(&release.url)
+                {
+                    platform::open_url(&release.url);
+                }
+            });
+        ui.add_space(4.0);
     }
 
     fn status_tab(&mut self, ui: &mut egui::Ui) {
@@ -489,6 +518,15 @@ impl App {
             &mut self.edit.minimize_to_tray,
             "Beim Schließen im Tray weiterlaufen",
         );
+        ui.checkbox(
+            &mut self.edit.check_updates,
+            "Beim Start nach Updates suchen",
+        );
+        ui.label(
+            RichText::new("Sendet dabei eine Anfrage an GitHub. Ohne Haken verbindet sich AirBridge nie mit dem Internet.")
+                .weak()
+                .small(),
+        );
         ui.add_space(6.0);
 
         ui.label(RichText::new("Sicherheit").strong());
@@ -553,6 +591,28 @@ impl App {
         ui.add_space(12.0);
         ui.separator();
         ui.label(RichText::new("Werkzeuge").strong());
+        let checking = shared::with(|s| s.update == UpdateState::Checking);
+        if ui
+            .add_enabled(!checking, egui::Button::new("Jetzt nach Updates suchen"))
+            .clicked()
+        {
+            updater::spawn_check();
+        }
+        match shared::with(|s| s.update.clone()) {
+            UpdateState::Checking => {
+                ui.label(RichText::new("Prüfe …").weak().small());
+            }
+            UpdateState::UpToDate => {
+                ui.label(RichText::new("AirBridge ist aktuell.").weak().small());
+            }
+            UpdateState::Available(r) => {
+                ui.label(RichText::new(format!("Version {} ist verfügbar.", r.version)).small());
+            }
+            UpdateState::Failed(e) => {
+                ui.colored_label(Color32::LIGHT_RED, format!("Prüfung fehlgeschlagen: {e}"));
+            }
+            UpdateState::Idle => {}
+        }
         if ui.button("Firewall-Regel anlegen").clicked() {
             if let Err(e) = platform::firewall(true) {
                 self.notice = Some(format!("{e:#}"));

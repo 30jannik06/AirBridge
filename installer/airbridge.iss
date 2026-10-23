@@ -23,6 +23,11 @@ SolidCompression=yes
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=admin
+; A running AirBridge locks its exe: Setup finds it via the mutex and closes it before replacing the files.
+AppMutex=AirBridgeSingleInstance
+CloseApplications=yes
+CloseApplicationsFilter=airbridge.exe
+RestartApplications=no
 WizardStyle=modern
 
 [Languages]

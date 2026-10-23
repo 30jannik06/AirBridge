@@ -39,6 +39,7 @@ pub struct Shared {
     pub latency_ms: f32,
     pub net_error: Option<String>,
     pub music: crate::music::Music,
+    pub update: crate::updater::UpdateState,
     ctx: Option<eframe::egui::Context>,
     net: Option<Sender<NetCmd>>,
 }
@@ -56,6 +57,7 @@ fn cell() -> &'static Mutex<Shared> {
             latency_ms: 0.0,
             net_error: None,
             music: Default::default(),
+            update: Default::default(),
             ctx: None,
             net: None,
         })

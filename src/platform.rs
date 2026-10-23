@@ -38,6 +38,31 @@ pub fn message(title: &str, text: &str, error: bool) {
     };
 }
 
+/// `true` if another AirBridge is already running. The named mutex also lets the installer detect a running copy.
+pub fn already_running() -> bool {
+    use windows::Win32::Foundation::{ERROR_ALREADY_EXISTS, GetLastError};
+    use windows::Win32::System::Threading::CreateMutexW;
+    let handle = unsafe { CreateMutexW(None, false, w!("AirBridgeSingleInstance")) };
+    let exists = unsafe { GetLastError() } == ERROR_ALREADY_EXISTS;
+    // Keep the handle open for the whole program run (it is closed when the process ends).
+    std::mem::forget(handle);
+    exists
+}
+
+/// Opens a web page in the default browser.
+pub fn open_url(url: &str) {
+    unsafe {
+        ShellExecuteW(
+            None,
+            w!("open"),
+            &HSTRING::from(url),
+            None,
+            None,
+            SW_SHOWNORMAL,
+        );
+    }
+}
+
 const RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
 
 /// Turns "start with Windows" on or off (entry in the current user's Run key, no admin rights needed).
