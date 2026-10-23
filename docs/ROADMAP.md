@@ -3,7 +3,8 @@
 Ideas, roughly by value. Nothing here is promised.
 
 - **Audio/video sync** using the RTP timestamps and the NTP clock.
-- **Volume sync** with the iPhone (`SET_PARAMETER volume`).
+- **AirPlay video by link** (YouTube and similar casts from the iPhone) and photo sharing.
+- **Seek bar:** click the progress bar to jump (needs DACP).
 - **Executable icon** (embedded resource) instead of only the window icon.
 - **Better scaling / GPU rendering** (today: software bilinear scaling).
 - **Multiple devices / reconnect polish.**

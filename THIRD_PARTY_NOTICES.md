@@ -23,20 +23,23 @@ Der Rust-Wrapper `fdk-aac` selbst steht unter MIT, der Codec dahinter unter der 
 | Crate | Version | Lizenz |
 |---|---|---|
 | aes | 0.9.3 | MIT OR Apache-2.0 |
+| alac (Feature `audio`) | 0.5.0 | MIT OR Apache-2.0 |
 | anyhow | 1.0.104 | MIT OR Apache-2.0 |
 | cbc | 0.2.1 | MIT OR Apache-2.0 |
 | cc (nur Build) | 1.9.0 | MIT OR Apache-2.0 |
 | cpal | 0.18.2 | Apache-2.0 |
 | ctr | 0.10.1 | MIT OR Apache-2.0 |
 | ed25519-dalek | 3.0.0 | BSD-3-Clause |
+| eframe / egui | 0.37.0 | MIT OR Apache-2.0 |
+| image (nur JPEG/PNG für Cover) | 0.25.10 | MIT OR Apache-2.0 |
 | fdk-aac | 0.8.0 | MIT |
 | getrandom | 0.4.3 | MIT OR Apache-2.0 |
 | mdns-sd | 0.21.6 | Apache-2.0 OR MIT |
 | plist | 1.10.3 | MIT |
+| serde / serde_json | 1.0 | MIT OR Apache-2.0 |
 | sha2 | 0.11.1 | MIT OR Apache-2.0 |
-| softbuffer | 0.4.8 | MIT OR Apache-2.0 |
+| tray-icon | 0.26.1 | MIT OR Apache-2.0 |
 | windows | 0.62.2 | MIT OR Apache-2.0 |
-| winit | 0.30.13 | Apache-2.0 |
 | x25519-dalek | 3.0.0 | BSD-3-Clause |
 
 Dazu kommen die transitiven Abhängigkeiten dieser Crates (fast ausschließlich MIT und/oder Apache-2.0). Eine vollständige
@@ -71,8 +74,9 @@ Praktische Folgen:
 - **Private Nutzung auf eigenen Geräten** ist davon nicht betroffen.
 - **Weitergabe der fertigen `.exe`** an andere kann gegen die Lizenzbedingungen verstoßen. Das ist keine Rechtsberatung.
 - **Lösung in diesem Projekt:** FDK-AAC steckt hinter dem Cargo-Feature `nonfree-audio` (standardmäßig aus). Die veröffentlichten Programme
-  (Setup und portable ZIP) werden ohne dieses Feature gebaut, enthalten also **kein FDK-AAC** und keinen Ton.
-  Wer Ton will, baut selbst (`cargo build --release --features nonfree-audio`, siehe [docs/BUILDING.md](docs/BUILDING.md)) und gibt dieses
+  (Setup und portable ZIP) werden ohne dieses Feature gebaut, enthalten also **kein FDK-AAC**. Sie spielen Musik
+  (ALAC, frei lizenziert, Feature `audio`), aber nicht den Ton beim Bildschirmspiegeln (AAC-ELD).
+  Wer auch diesen Ton will, baut selbst (`cargo build --release --features nonfree-audio`, siehe [docs/BUILDING.md](docs/BUILDING.md)) und gibt dieses
   Programm nicht weiter.
 - Weitere Wege, wenn andere AirBridge mit Ton nutzen sollen:
   - **Nur den Quellcode weitergeben** (mit `LICENSE` und diesen Hinweisen). Jeder baut sich die `.exe` selbst.

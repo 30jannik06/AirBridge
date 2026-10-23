@@ -4,6 +4,20 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-23
+
+### Added
+- **Music:** AirPlay audio (ALAC) is played, no extra codec licence needed, so the downloads now have sound for music.
+- **"Now playing" view:** cover, title, artist, album, progress, volume and a live spectrum.
+- **Remote control** (play/pause, next, previous) through DACP, where the iPhone allows it.
+- **iPhone volume** buttons now control AirBridge's volume.
+- **"Trusted devices only"** mode: unknown devices are rejected silently.
+- The status tab shows music connections and the current track.
+
+### Changed
+- Cargo features: `audio` (default, ALAC and playback) and `nonfree-audio` (adds FDK-AAC for mirroring sound).
+  Releases are built with `audio` only.
+
 ## [0.2.0] - 2026-10-23
 
 ### Added

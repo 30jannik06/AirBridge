@@ -6,7 +6,8 @@ AirBridge is a single Rust binary with a handful of threads.
 iPhone ──mDNS──────▶ discovery           announces _airplay._tcp and _raop._tcp
 iPhone ──TCP 7000──▶ rtsp ─▶ pairing / fairplay / stream     session setup, keys
 iPhone ──TCP 7100──▶ mirror ─▶ sps ─▶ decoder ─▶ window      video
-iPhone ──UDP───────▶ audio ─▶ FDK-AAC ─▶ playback            audio (feature "nonfree-audio")
+iPhone ──UDP───────▶ audio ─▶ ALAC / FDK-AAC ─▶ playback    music and mirroring sound (feature "audio")
+iPhone ──RTSP SET_PARAMETER─▶ music ─▶ ui                    title, cover, progress, volume (now playing)
 ```
 
 ## Threads
@@ -19,7 +20,7 @@ iPhone ──UDP───────▶ audio ─▶ FDK-AAC ─▶ playback   
 | mirror | Accepts the video TCP connection on port 7100, decrypts, forwards NAL units. |
 | decoder | Receives NAL units over a bounded channel, decodes via Media Foundation, publishes the newest frame. |
 | ntp | Sends NTP requests to the iPhone's timing port while a session is alive. |
-| audio / playback | (feature `nonfree-audio`) receives RTP, decrypts, decodes, resamples, plays via cpal. |
+| audio / playback | (feature `audio`) receives RTP, decrypts, decodes (ALAC, or AAC-ELD with `nonfree-audio`), resamples, plays via cpal. |
 
 The decoder publishes into a single-slot `Latest` mailbox and wakes the window through the egui context (`shared::wake`).
 If the window is slow, frames are dropped instead of queued: latency stays low.
@@ -43,7 +44,10 @@ If the window is slow, frames are dropped instead of queued: latency stays low.
 | `tray.rs` | Tray icon and menu (tray-icon) |
 | `settings.rs` | `settings.json`: name, window and system options, trusted devices |
 | `shared.rs` | Global state shared by network threads and UI: log, settings, pending approval |
-| `audio.rs`, `playback.rs` | (feature `nonfree-audio`) audio pipeline |
+| `audio.rs`, `playback.rs` | (feature `audio`) audio pipeline: ALAC decoder, optional AAC-ELD, volume, sample ring for the spectrum |
+| `music.rs` | "Now playing" state: DMAP metadata, cover, progress, volume from `SET_PARAMETER` |
+| `spectrum.rs` | FFT and 32 logarithmic bands for the visualiser |
+| `dacp.rs` | Remote control of the iPhone (play/pause/next/previous) via DACP over mDNS + HTTP |
 | `platform.rs` | Windows helpers: hide console, message boxes, firewall rule, autostart |
 | `icon.rs` | Window icon, drawn at runtime |
 | `selftest.rs` | Offline decoder test (`--decode-file`) |
@@ -52,8 +56,10 @@ If the window is slow, frames are dropped instead of queued: latency stays low.
 
 ## Features
 
-- `nonfree-audio` (off by default, because FDK-AAC is not GPL-compatible): AAC-ELD decoding with FDK-AAC and playback with cpal.
-  Without it AirBridge still answers the iPhone's audio setup (it expects ports) but drops the packets.
+- `audio` (default): playback with cpal and the ALAC decoder (AirPlay music). All permissively licensed.
+- `nonfree-audio` (off by default, implies `audio`): adds AAC-ELD decoding with FDK-AAC for the sound that goes with screen
+  mirroring. Off by default because FDK-AAC is not GPL-compatible. Without it AirBridge still answers the iPhone's audio
+  setup for mirroring (it expects ports) but cannot decode that stream.
 
 ## Key file location (`identity::key_path`)
 

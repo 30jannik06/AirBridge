@@ -11,19 +11,20 @@ Du spiegelst dein iPhone über Kontrollzentrum → Bildschirmsynchronisierung au
 - **Eine kleine Datei** (ca. 7 MB), keine Laufzeit-Abhängigkeiten.
 - **Schöne Oberfläche:** Status, Einstellungen, Live-Log, Tray-Symbol, optionale Bestätigung neuer Geräte.
 - **Wenig Verzögerung:** H.264 über den in Windows eingebauten Decoder (Media Foundation), Fenster mit Vollbild.
-- **Ton** (optional, beim Bauen wählbar): AAC-ELD über FDK-AAC, Ausgabe auf den Standard-Lautsprechern.
+- **Musik:** AirPlay-Audio (ALAC) mit „Läuft gerade“-Ansicht: Cover, Titel, Fortschritt, Spektrum und Play/Pause/Weiter-Tasten.
+- **Ton beim Spiegeln** (optional, beim Bauen wählbar): AAC-ELD über FDK-AAC, siehe Hinweis unten.
 - **Setup oder portabel:** beides gibt es auf der Releases-Seite.
 
 ## Status
 
-Getestet mit einem iPhone unter Windows 11. Funktioniert: Erkennung, Pairing, Bild, Ton (selbst gebaut), Drehen, Vollbild.
+Getestet mit einem iPhone unter Windows 11. Funktioniert: Erkennung, Pairing, Bild, Musik, Drehen, Vollbild, Einstellungen, Tray. Ton beim Spiegeln gibt es in selbst gebauten Versionen.
 
 Bekannte Einschränkungen:
 
 - Nur Windows, nur ein iPhone gleichzeitig.
 - Kein DRM-Inhalt (Netflix, Disney+, …): das blockiert iOS selbst beim Spiegeln.
 - Ton und Bild sind nicht exakt synchronisiert.
-- Kein Lautstärke-Abgleich mit dem iPhone; der Ton folgt der Windows-Lautstärke.
+- Ton beim Bildschirmspiegeln gibt es nur in selbst gebauten Versionen (siehe Hinweis unten). Musik geht auch in den Downloads.
 - Nicht geprüft: iPad, Mac, mehrere gleichzeitige Verbindungen, sehr alte iOS-Versionen.
 
 ## Installation
@@ -35,8 +36,9 @@ Download auf der [Releases](https://github.com/30jannik06/AirBridge/releases)-Se
 | **Setup** (`AirBridge-Setup-x.y.z.exe`) | Normale Nutzung | Ausführen: installiert nach Programme, legt Startmenü-Eintrag und Firewall-Regel an. |
 | **Portabel** (`AirBridge-x.y.z-portable.zip`) | USB-Stick, keine Adminrechte | Irgendwohin entpacken, `airbridge.exe` starten. Einstellungen bleiben neben der Exe (`portable.txt`). |
 
-> **Zum Ton in den Downloads.** Die Lizenz des AAC-Codecs (FDK-AAC) ist nicht mit der GPL vereinbar. Darum sind die
-> fertigen Programme **ohne Ton** gebaut (nur Bild). Für Ton baust du selbst mit `--features nonfree-audio`, siehe
+> **Zum Ton in den Downloads.** Musik vom iPhone (AirPlay-Audio) funktioniert direkt. Der Ton zum **Bildschirmspiegeln**
+> nutzt den AAC-ELD-Codec (FDK-AAC), dessen Lizenz nicht mit der GPL vereinbar ist; die fertigen Programme lassen ihn
+> darum weg. Wer auch diesen Ton will, baut selbst mit `--features nonfree-audio`, siehe
 > [docs/BUILDING.md](docs/BUILDING.md). Details: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Benutzung
@@ -50,6 +52,12 @@ Download auf der [Releases](https://github.com/30jannik06/AirBridge/releases)-Se
 | `F11` oder Doppelklick | Vollbild an/aus |
 | `Esc` | Vollbild verlassen |
 | Fenster schließen | Beenden |
+
+### Musik
+
+Spiele auf dem iPhone Musik (oder ein Video) ab und wähle mit dem AirPlay-Symbol **AirBridge**. Das Fenster zeigt Cover,
+Titel, Interpret, Fortschritt und ein Live-Spektrum. Die Lautstärketasten am iPhone steuern die Lautstärke von AirBridge.
+Erlaubt das iPhone Fernsteuerung, funktionieren auch Play/Pause/Zurück/Weiter; sonst steuerst du die Musik am Handy.
 
 ### Einstellungen
 
@@ -82,8 +90,8 @@ Die Regel erlaubt **eingehende** Verbindungen nur in privaten und Domänen-Netzw
 ## Selbst bauen
 
 ```powershell
-cargo build --release                           # nur Bild (so bauen die Releases)
-cargo build --release --features nonfree-audio  # mit Ton, nur für den eigenen Gebrauch (nicht weitergeben)
+cargo build --release                           # so bauen die Releases (Musik, kein Ton beim Spiegeln)
+cargo build --release --features nonfree-audio  # plus Ton beim Spiegeln, nur für den eigenen Gebrauch (nicht weitergeben)
 ```
 
 Voraussetzungen und Hinweise zu Virenscanner/EDR: [docs/BUILDING.md](docs/BUILDING.md).

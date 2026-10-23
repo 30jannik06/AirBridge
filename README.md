@@ -11,19 +11,20 @@ Mirror your iPhone from Control Center → Screen Mirroring to a Windows PC. No 
 - **One small executable** (about 7 MB), no runtime dependencies.
 - **Friendly interface:** status, settings, live log, tray icon, optional "allow this device?" prompt.
 - **Low latency video:** H.264 decoded by the decoder built into Windows (Media Foundation), plus a window with fullscreen.
-- **Audio** (optional, build-time feature): AAC-ELD via FDK-AAC, played on your default speakers.
+- **Music:** AirPlay audio (ALAC) with a "now playing" view: cover, title, progress, spectrum and play/pause/next buttons.
+- **Sound while mirroring** (optional, build-time feature): AAC-ELD via FDK-AAC, see the note below.
 - **Installer or portable:** both are provided on the releases page.
 
 ## Status
 
-Tested with an iPhone on Windows 11. Working: discovery, pairing, video, audio (self-built), rotation, fullscreen.
+Tested with an iPhone on Windows 11. Working: discovery, pairing, video, music, rotation, fullscreen, settings, tray. Sound while mirroring works in self-built versions.
 
 Known limitations:
 
 - Windows only, one iPhone at a time.
 - No DRM content (Netflix, Disney+, …): iOS itself blocks that while mirroring.
 - Audio and video are not precisely synchronised.
-- No volume sync with the iPhone; audio follows the Windows volume.
+- Sound while screen mirroring is only in self-built versions (see the note below). Music works in the downloads.
 - Not tested: iPad, Mac, several simultaneous connections, very old iOS versions.
 
 ## Install
@@ -35,8 +36,9 @@ Download from the [Releases](https://github.com/30jannik06/AirBridge/releases) p
 | **Setup** (`AirBridge-Setup-x.y.z.exe`) | Normal use | Run it: installs to Program Files, adds a Start menu entry and the firewall rule. |
 | **Portable** (`AirBridge-x.y.z-portable.zip`) | USB stick, no admin rights | Unzip anywhere, run `airbridge.exe`. Settings stay next to the exe (marked by `portable.txt`). |
 
-> **About audio in the downloads.** The licence of the AAC codec (FDK-AAC) is not compatible with the GPL, so the
-> prebuilt binaries are built **without audio** (video only). To get sound, build it yourself with `--features nonfree-audio`, see
+> **About sound in the downloads.** Music from the iPhone (AirPlay audio) works out of the box. The sound that goes with
+> **screen mirroring** uses the AAC-ELD codec (FDK-AAC), whose licence is not compatible with the GPL, so the prebuilt
+> binaries leave it out. To get that sound too, build it yourself with `--features nonfree-audio`, see
 > [docs/BUILDING.md](docs/BUILDING.md). Details: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Usage
@@ -52,6 +54,12 @@ Download from the [Releases](https://github.com/30jannik06/AirBridge/releases) p
 | Close window | Quit |
 
 The window follows the picture size (e.g. when you rotate the phone).
+
+### Music
+
+Play music (or a video) on the iPhone and pick **AirBridge** with the AirPlay button. The window shows cover, title, artist,
+a progress bar and a live spectrum. The iPhone volume buttons control AirBridge's volume. If the iPhone allows remote
+control, the play/pause/previous/next buttons work too; otherwise control the music on the phone.
 
 ### Settings
 
@@ -84,8 +92,8 @@ The rule allows **inbound** connections for AirBridge on private and domain netw
 ## Build from source
 
 ```powershell
-cargo build --release                           # video only (what the releases use)
-cargo build --release --features nonfree-audio  # with audio, for your own use only (do not redistribute)
+cargo build --release                           # what the releases use (music, no mirroring sound)
+cargo build --release --features nonfree-audio  # plus sound while mirroring, for your own use only (do not redistribute)
 ```
 
 Prerequisites and EDR/antivirus hints: [docs/BUILDING.md](docs/BUILDING.md).

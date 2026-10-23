@@ -64,7 +64,21 @@ does not work as an alternative.
 
 ## 6. Audio (UDP)
 
-- RTP, AAC-ELD (ct 8), 480 samples per frame at 44.1 kHz stereo.
+- RTP with ALAC (ct 2, music, 352 samples per frame) or AAC-ELD (ct 8, mirroring sound, 480 samples per frame), 44.1 kHz stereo.
 - Payload encrypted with AES-128-CBC; key is `key16`, IV is `eiv`.
 - Each packet is sent three times (redundancy): dedupe by sequence number.
 - Device usually runs at 48 kHz: resample 44.1 → device rate.
+
+### Now playing (RTSP `SET_PARAMETER`)
+
+While music plays the iPhone sends, on the RTSP connection:
+
+| Content-Type | Body |
+|---|---|
+| `application/x-dmap-tagged` | DMAP/DAAP: 4-byte tag, 4-byte big-endian length, data. `minm` title, `asar` artist, `asal` album, inside `mlit` containers |
+| `image/jpeg`, `image/png` | cover art |
+| `text/parameters` | `volume: -15.0` (dB, 0 = full, about -30 = quiet, -144 = mute) and `progress: start/current/end` in 44100ths of a second |
+
+Remote control: every RTSP request carries `DACP-ID` and `Active-Remote`. The iPhone announces `iTunes_Ctrl_<DACP-ID>` as
+`_dacp._tcp` on mDNS; commands are plain HTTP GETs such as `/ctrl-int/1/playpause`, `nextitem`, `previtem` with the
+`Active-Remote` header.

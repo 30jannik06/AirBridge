@@ -17,14 +17,15 @@
 ## Build
 
 ```powershell
-cargo build --release                                 # video only (what releases use)
-cargo build --release --features nonfree-audio        # with audio, for your own use only
+cargo build --release                                 # what releases use: video + music
+cargo build --release --features nonfree-audio        # plus sound while mirroring, for your own use only
+cargo build --release --no-default-features           # no audio at all
 cargo test                                    # unit tests
 cargo fmt --check                             # formatting
 ```
 
-Result: `target\release\airbridge.exe` (about 7 MB without audio). The first build is slower because the C code (playfair)
-and, with audio, the C++ code (FDK-AAC) are compiled too.
+Result: `target\release\airbridge.exe` (about 7 MB). The first build is slower because the C code (playfair)
+and, with `nonfree-audio`, the C++ code (FDK-AAC) are compiled too.
 
 For development with log output, run from a terminal: `cargo run --release`. When started by double click the
 console is hidden and errors show up as a dialog.
@@ -32,7 +33,8 @@ console is hidden and errors show up as a dialog.
 ## Why two variants?
 
 `playfair` is GPL-3.0; FDK-AAC's licence is considered GPL-incompatible by the FSF. Building both together for **your own
-use** is fine, but distributing that binary is not. Therefore audio is an opt-in feature (`nonfree-audio`) and releases are built without it.
+use** is fine, but distributing that binary is not. Therefore FDK-AAC is behind the opt-in feature `nonfree-audio` and releases are built without it. Music (ALAC) does not
+need FDK-AAC and is part of the normal build.
 See [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md). This is not legal advice.
 
 ## Packaging

@@ -1,6 +1,6 @@
 name: Release
 
-# Wird durch ein Tag wie v0.1.0 ausgelöst. Die Programme werden OHNE Ton gebaut (FDK-AAC ist nicht GPL-kompatibel).
+# Wird durch ein Tag wie v0.1.0 ausgelöst. Die Programme werden ohne FDK-AAC gebaut (nicht GPL-kompatibel): Musik ja, Ton beim Spiegeln nein.
 on:
   push:
     tags: ["v*"]
