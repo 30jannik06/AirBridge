@@ -17,8 +17,8 @@
 ## Build
 
 ```powershell
-cargo build --release                         # with audio (default feature)
-cargo build --release --no-default-features   # video only
+cargo build --release                                 # video only (what releases use)
+cargo build --release --features nonfree-audio        # with audio, for your own use only
 cargo test                                    # unit tests
 cargo fmt --check                             # formatting
 ```
@@ -32,7 +32,7 @@ console is hidden and errors show up as a dialog.
 ## Why two variants?
 
 `playfair` is GPL-3.0; FDK-AAC's licence is considered GPL-incompatible by the FSF. Building both together for **your own
-use** is fine, but distributing that binary is not. Therefore releases are built with `--no-default-features`.
+use** is fine, but distributing that binary is not. Therefore audio is an opt-in feature (`nonfree-audio`) and releases are built without it.
 See [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md). This is not legal advice.
 
 ## Packaging

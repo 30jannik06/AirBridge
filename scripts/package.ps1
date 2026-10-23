@@ -8,8 +8,8 @@ $ErrorActionPreference = "Stop"
 Set-Location (Split-Path $PSScriptRoot -Parent)
 
 if (-not $SkipBuild) {
-    # Ohne Feature "audio": FDK-AAC ist nicht GPL-kompatibel, darum nur Bild in veröffentlichten Programmen.
-    cargo build --release --no-default-features
+    # Ohne Feature "nonfree-audio": FDK-AAC ist nicht GPL-kompatibel, darum nur Bild in veröffentlichten Programmen.
+    cargo build --release
     if ($LASTEXITCODE -ne 0) { throw "cargo build fehlgeschlagen" }
 }
 

@@ -6,7 +6,7 @@ AirBridge is a single Rust binary with a handful of threads.
 iPhone ──mDNS──────▶ discovery           announces _airplay._tcp and _raop._tcp
 iPhone ──TCP 7000──▶ rtsp ─▶ pairing / fairplay / stream     session setup, keys
 iPhone ──TCP 7100──▶ mirror ─▶ sps ─▶ decoder ─▶ window      video
-iPhone ──UDP───────▶ audio ─▶ FDK-AAC ─▶ playback            audio (feature "audio")
+iPhone ──UDP───────▶ audio ─▶ FDK-AAC ─▶ playback            audio (feature "nonfree-audio")
 ```
 
 ## Threads
@@ -18,7 +18,7 @@ iPhone ──UDP───────▶ audio ─▶ FDK-AAC ─▶ playback   
 | mirror | Accepts the video TCP connection on port 7100, decrypts, forwards NAL units. |
 | decoder | Receives NAL units over a bounded channel, decodes via Media Foundation, publishes the newest frame. |
 | ntp | Sends NTP requests to the iPhone's timing port while a session is alive. |
-| audio / playback | (feature `audio`) receives RTP, decrypts, decodes, resamples, plays via cpal. |
+| audio / playback | (feature `nonfree-audio`) receives RTP, decrypts, decodes, resamples, plays via cpal. |
 
 The decoder publishes into a single-slot `Latest` mailbox and wakes the window with an event-loop proxy.
 If the window is slow, frames are dropped instead of queued: latency stays low.
@@ -39,7 +39,7 @@ If the window is slow, frames are dropped instead of queued: latency stays low.
 | `sps.rs` | Rewrites the SPS so the decoder does not buffer frames |
 | `decoder.rs` | Media Foundation H.264 decoder, NV12 → RGB |
 | `window.rs` | winit window, softbuffer drawing, bilinear scaling, fullscreen |
-| `audio.rs`, `playback.rs` | (feature `audio`) audio pipeline |
+| `audio.rs`, `playback.rs` | (feature `nonfree-audio`) audio pipeline |
 | `platform.rs` | Windows helpers: hide console, message boxes, firewall rule |
 | `icon.rs` | Window icon, drawn at runtime |
 | `selftest.rs` | Offline decoder test (`--decode-file`) |
@@ -48,7 +48,7 @@ If the window is slow, frames are dropped instead of queued: latency stays low.
 
 ## Features
 
-- `audio` (default): AAC-ELD decoding with FDK-AAC and playback with cpal.
+- `nonfree-audio` (off by default, because FDK-AAC is not GPL-compatible): AAC-ELD decoding with FDK-AAC and playback with cpal.
   Without it AirBridge still answers the iPhone's audio setup (it expects ports) but drops the packets.
 
 ## Key file location (`identity::key_path`)

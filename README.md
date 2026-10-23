@@ -35,7 +35,7 @@ Download from the [Releases](https://github.com/30jannik06/AirBridge/releases) p
 | **Portable** (`AirBridge-x.y.z-portable.zip`) | USB stick, no admin rights | Unzip anywhere, run `airbridge.exe`. Settings stay next to the exe (marked by `portable.txt`). |
 
 > **About audio in the downloads.** The licence of the AAC codec (FDK-AAC) is not compatible with the GPL, so the
-> prebuilt binaries are built **without audio** (video only). To get sound, build it yourself with one command, see
+> prebuilt binaries are built **without audio** (video only). To get sound, build it yourself with `--features nonfree-audio`, see
 > [docs/BUILDING.md](docs/BUILDING.md). Details: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Usage
@@ -75,8 +75,8 @@ The rule allows **inbound** connections for AirBridge on private and domain netw
 ## Build from source
 
 ```powershell
-cargo build --release                         # with audio (for your own use)
-cargo build --release --no-default-features   # video only (what the releases use)
+cargo build --release                           # video only (what the releases use)
+cargo build --release --features nonfree-audio  # with audio, for your own use only (do not redistribute)
 ```
 
 Prerequisites and EDR/antivirus hints: [docs/BUILDING.md](docs/BUILDING.md).

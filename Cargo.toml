@@ -11,11 +11,11 @@ categories = ["multimedia::video", "network-programming"]
 publish = false
 
 [features]
-# Sound (AAC-ELD via FDK-AAC + playback via cpal). On by default for source builds.
-# The prebuilt releases are built WITHOUT it (--no-default-features), because the FDK-AAC license
-# is not compatible with the GPL when distributing binaries. See THIRD_PARTY_NOTICES.md.
-default = ["audio"]
-audio = ["dep:fdk-aac", "dep:cpal", "dep:cbc"]
+# Sound (AAC-ELD via FDK-AAC + playback via cpal). OFF by default, and the prebuilt releases are built without it:
+# the FDK-AAC license is not compatible with the GPL when distributing binaries. Build it yourself for your own
+# use with `--features nonfree-audio`, and do not redistribute that binary. See THIRD_PARTY_NOTICES.md.
+default = []
+nonfree-audio = ["dep:fdk-aac", "dep:cpal", "dep:cbc"]
 
 [dependencies]
 aes = "0.9.3"

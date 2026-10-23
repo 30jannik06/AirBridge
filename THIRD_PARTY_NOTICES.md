@@ -70,9 +70,9 @@ Praktische Folgen:
 
 - **Private Nutzung auf eigenen Geräten** ist davon nicht betroffen.
 - **Weitergabe der fertigen `.exe`** an andere kann gegen die Lizenzbedingungen verstoßen. Das ist keine Rechtsberatung.
-- **Lösung in diesem Projekt:** FDK-AAC steckt hinter dem Cargo-Feature `audio`. Die veröffentlichten Programme
-  (Setup und portable ZIP) werden mit `--no-default-features` gebaut, enthalten also **kein FDK-AAC** und keinen Ton.
-  Wer Ton will, baut selbst (`cargo build --release`, siehe [docs/BUILDING.md](docs/BUILDING.md)) und gibt dieses
+- **Lösung in diesem Projekt:** FDK-AAC steckt hinter dem Cargo-Feature `nonfree-audio` (standardmäßig aus). Die veröffentlichten Programme
+  (Setup und portable ZIP) werden ohne dieses Feature gebaut, enthalten also **kein FDK-AAC** und keinen Ton.
+  Wer Ton will, baut selbst (`cargo build --release --features nonfree-audio`, siehe [docs/BUILDING.md](docs/BUILDING.md)) und gibt dieses
   Programm nicht weiter.
 - Weitere Wege, wenn andere AirBridge mit Ton nutzen sollen:
   - **Nur den Quellcode weitergeben** (mit `LICENSE` und diesen Hinweisen). Jeder baut sich die `.exe` selbst.

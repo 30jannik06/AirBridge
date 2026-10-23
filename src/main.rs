@@ -1,7 +1,7 @@
 // AirBridge: AirPlay-Mirroring-Receiver für Windows.
 // Phase 1: mDNS-Discovery   Phase 2: RTSP-Server + Pairing   Phase 3: FairPlay, SETUP, Mirror-Kanal
 // Phase 4: H.264-Decoder (Media Foundation) + Live-Fenster
-#[cfg(feature = "audio")]
+#[cfg(feature = "nonfree-audio")]
 mod audio;
 mod config;
 mod decoder;
@@ -13,7 +13,7 @@ mod mirror;
 mod ntp;
 mod pairing;
 mod platform;
-#[cfg(feature = "audio")]
+#[cfg(feature = "nonfree-audio")]
 mod playback;
 mod rtsp;
 mod selftest;

@@ -12,10 +12,11 @@ Use the bug report template. Please include: Windows version, iPhone model and i
 ```powershell
 cargo fmt
 cargo test
-cargo build --release --no-default-features   # and also without the flag
+cargo build --release                           # video only (default)
+cargo build --release --features nonfree-audio  # with audio
 ```
 
-Please make sure both feature variants compile without warnings (`audio` on and off).
+Please make sure both feature variants compile without warnings (`nonfree-audio` on and off). Do not make it a default feature.
 
 Guidelines:
 

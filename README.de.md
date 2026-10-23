@@ -35,7 +35,7 @@ Download auf der [Releases](https://github.com/30jannik06/AirBridge/releases)-Se
 | **Portabel** (`AirBridge-x.y.z-portable.zip`) | USB-Stick, keine Adminrechte | Irgendwohin entpacken, `airbridge.exe` starten. Einstellungen bleiben neben der Exe (`portable.txt`). |
 
 > **Zum Ton in den Downloads.** Die Lizenz des AAC-Codecs (FDK-AAC) ist nicht mit der GPL vereinbar. Darum sind die
-> fertigen Programme **ohne Ton** gebaut (nur Bild). Für Ton baust du selbst mit einem Befehl, siehe
+> fertigen Programme **ohne Ton** gebaut (nur Bild). Für Ton baust du selbst mit `--features nonfree-audio`, siehe
 > [docs/BUILDING.md](docs/BUILDING.md). Details: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Benutzung
@@ -73,8 +73,8 @@ Die Regel erlaubt **eingehende** Verbindungen nur in privaten und Domänen-Netzw
 ## Selbst bauen
 
 ```powershell
-cargo build --release                         # mit Ton (für den eigenen Gebrauch)
-cargo build --release --no-default-features   # nur Bild (so bauen die Releases)
+cargo build --release                           # nur Bild (so bauen die Releases)
+cargo build --release --features nonfree-audio  # mit Ton, nur für den eigenen Gebrauch (nicht weitergeben)
 ```
 
 Voraussetzungen und Hinweise zu Virenscanner/EDR: [docs/BUILDING.md](docs/BUILDING.md).

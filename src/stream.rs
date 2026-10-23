@@ -2,7 +2,7 @@
 // iOS schickt SETUP zweimal:
 //   1. mit `ekey`/`eiv` (verschlüsselter Schlüssel) -> wir antworten mit timingPort/eventPort
 //   2. mit `streams` (Typ 110 = Mirroring-Video, 96 = Audio) -> wir antworten mit dataPort
-#[cfg(feature = "audio")]
+#[cfg(feature = "nonfree-audio")]
 use crate::audio::{self, AudioParams};
 use crate::config;
 use crate::fairplay::FairPlay;
@@ -20,7 +20,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 #[derive(Default)]
 pub struct StreamState {
     aes_key: Option<[u8; 16]>,
-    #[cfg_attr(not(feature = "audio"), allow(dead_code))]
+    #[cfg_attr(not(feature = "nonfree-audio"), allow(dead_code))]
     aes_iv: Option<[u8; 16]>, // `eiv` aus SETUP 1, wird für die Audio-Entschlüsselung gebraucht
     // Solange die Sockets leben, bleiben ihre Ports reserviert (Drop = Port frei).
     _sockets: Vec<UdpSocket>,
@@ -140,7 +140,7 @@ pub fn setup(
                     let (data_port, control_port) =
                         (data.local_addr()?.port(), control.local_addr()?.port());
 
-                    #[cfg(feature = "audio")]
+                    #[cfg(feature = "nonfree-audio")]
                     {
                         println!("   Audio-Anfrage vom iPhone: {d:?}");
                         let get = |name: &str| {
@@ -159,9 +159,9 @@ pub fn setup(
                         let iv = st.aes_iv.ok_or_else(|| anyhow!("Audio-Setup ohne eiv"))?;
                         audio::start(data, control, key, iv, params, Arc::clone(&st.stop));
                     }
-                    // Ohne das Feature `audio` beantworten wir die Anfrage trotzdem (das iPhone erwartet Ports),
+                    // Ohne das Feature `nonfree-audio` beantworten wir die Anfrage trotzdem (das iPhone erwartet Ports),
                     // halten die Sockets offen und werfen die Audiopakete einfach weg: Bild ohne Ton.
-                    #[cfg(not(feature = "audio"))]
+                    #[cfg(not(feature = "nonfree-audio"))]
                     {
                         println!(
                             "   Audio-Stream angefragt, aber dieses Programm wurde ohne Ton gebaut."
