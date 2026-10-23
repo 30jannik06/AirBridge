@@ -38,6 +38,7 @@ pub struct Shared {
     pub ip: String,
     pub latency_ms: f32,
     pub net_error: Option<String>,
+    pub music: crate::music::Music,
     ctx: Option<eframe::egui::Context>,
     net: Option<Sender<NetCmd>>,
 }
@@ -54,10 +55,35 @@ fn cell() -> &'static Mutex<Shared> {
             ip: String::new(),
             latency_ms: 0.0,
             net_error: None,
+            music: Default::default(),
             ctx: None,
             net: None,
         })
     })
+}
+
+/// Wann zuletzt Ton angekommen ist (Millisekunden seit Programmstart); daran erkennt die Oberfläche "spielt gerade".
+static AUDIO_TICK_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+fn now_ms() -> u64 {
+    static START: OnceLock<std::time::Instant> = OnceLock::new();
+    START
+        .get_or_init(std::time::Instant::now)
+        .elapsed()
+        .as_millis() as u64
+        + 10_000
+}
+
+/// Vom Audio-Thread bei jedem Paket aufgerufen.
+#[cfg_attr(not(feature = "audio"), allow(dead_code))]
+pub fn mark_audio() {
+    AUDIO_TICK_MS.store(now_ms(), std::sync::atomic::Ordering::Relaxed);
+}
+
+/// `true`, wenn in der letzten Sekunde Ton angekommen ist.
+pub fn audio_recent() -> bool {
+    let tick = AUDIO_TICK_MS.load(std::sync::atomic::Ordering::Relaxed);
+    tick != 0 && now_ms().saturating_sub(tick) < 1200
 }
 
 /// Kurzer Zugriff auf den geteilten Zustand. Nicht verschachteln (sonst Deadlock) und nicht lange halten.

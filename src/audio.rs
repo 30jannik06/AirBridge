@@ -185,6 +185,7 @@ pub fn start(
                 }
             }
             next_seq = Some(seq.wrapping_add(1));
+            crate::shared::mark_audio();
 
             let Some(payload) = decrypt(&key, &iv, &buf[..len]) else {
                 continue;

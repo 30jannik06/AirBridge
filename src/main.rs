@@ -10,12 +10,14 @@ macro_rules! log {
 #[cfg(feature = "audio")]
 mod audio;
 mod config;
+mod dacp;
 mod decoder;
 mod discovery;
 mod fairplay;
 mod icon;
 mod identity;
 mod mirror;
+mod music;
 mod ntp;
 mod pairing;
 mod platform;
@@ -25,6 +27,9 @@ mod rtsp;
 mod selftest;
 mod settings;
 mod shared;
+#[cfg_attr(not(feature = "audio"), allow(dead_code))]
+// ohne Ton gibt es kein Spektrum, nur die Konstante BANDS wird gebraucht
+mod spectrum;
 mod sps;
 mod stream;
 mod tray;

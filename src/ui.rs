@@ -1,8 +1,10 @@
 // Oberfläche (egui): links ein Panel mit Status, Einstellungen und Log, in der Mitte das iPhone-Bild.
 // Sobald ein iPhone spiegelt, wird das Panel ausgeblendet und das Bild füllt das Fenster.
+use crate::dacp::{self, Command};
 use crate::decoder::{Latest, Update};
 use crate::settings::Settings;
 use crate::shared::{self, Decision};
+use crate::spectrum;
 use crate::tray::{self, Tray, TrayAction};
 use crate::{config, platform};
 use eframe::egui::{
@@ -37,6 +39,9 @@ pub struct App {
     notice: Option<String>,
     tray: Option<Tray>,
     last_motion: Instant,
+    cover: Option<TextureHandle>,
+    cover_gen: u64,
+    bars: [f32; spectrum::BANDS],
 }
 
 /// Startet die Oberfläche. Blockiert, bis das Programm beendet wird.
@@ -90,6 +95,9 @@ pub fn run(latest: Latest, start_hidden: bool) -> eframe::Result {
                 notice: None,
                 tray,
                 last_motion: Instant::now(),
+                cover: None,
+                cover_gen: 0,
+                bars: [0.0; spectrum::BANDS],
             }))
         }),
     )
@@ -177,6 +185,8 @@ impl eframe::App for App {
             }
         }
 
+        self.update_cover(&ctx);
+
         let settings = shared::settings();
         if ctx.input(|i| i.viewport().close_requested())
             && settings.minimize_to_tray
@@ -215,6 +225,8 @@ impl eframe::App for App {
 
         if self.connected {
             ctx.request_repaint_after(Duration::from_millis(500)); // damit die Schaltflächen wieder verschwinden
+        } else if shared::audio_recent() {
+            ctx.request_repaint_after(Duration::from_millis(33)); // Spektrum und Fortschritt animieren
         } else if self.show_panel {
             ctx.request_repaint_after(Duration::from_secs(1)); // neue Log-Zeilen und Status anzeigen
         }
@@ -266,6 +278,14 @@ impl App {
                 self.set_fullscreen(ui.ctx(), on);
                 self.auto_fullscreen = false;
             }
+            return;
+        }
+
+        // Musik statt Bild: "Läuft gerade"-Ansicht.
+        if shared::audio_recent() || shared::with(|s| s.music.has_track()) {
+            ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
+                self.player(ui, rect)
+            });
             return;
         }
 
@@ -580,4 +600,296 @@ fn log_tab(ui: &mut egui::Ui) {
                 ui.label(RichText::new(line).monospace().small());
             }
         });
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Musik-Ansicht ("Läuft gerade")
+// ---------------------------------------------------------------------------------------------------------------
+
+#[derive(Clone, Copy, PartialEq)]
+enum Icon {
+    Previous,
+    Next,
+    Play,
+    Pause,
+}
+
+impl App {
+    /// Lädt das Cover neu, wenn das iPhone ein neues geschickt hat (oder verwirft es am Ende der Wiedergabe).
+    fn update_cover(&mut self, ctx: &egui::Context) {
+        let (generation, bytes) = shared::with(|s| (s.music.cover_gen, s.music.cover.clone()));
+        if generation == self.cover_gen {
+            return;
+        }
+        self.cover_gen = generation;
+        self.cover = bytes
+            .and_then(|b| decode_cover(&b))
+            .map(|img| ctx.load_texture("cover", img, TextureOptions::LINEAR));
+    }
+
+    fn target_bars(&self) -> [f32; spectrum::BANDS] {
+        #[cfg(feature = "audio")]
+        {
+            spectrum::bands(&crate::playback::scope())
+        }
+        #[cfg(not(feature = "audio"))]
+        {
+            [0.0; spectrum::BANDS]
+        }
+    }
+
+    fn player(&mut self, ui: &mut egui::Ui, rect: egui::Rect) {
+        let music = shared::with(|s| s.music.clone());
+        let playing = shared::audio_recent();
+
+        // Balken: schnell nach oben, langsam nach unten
+        let target = if playing {
+            self.target_bars()
+        } else {
+            [0.0; spectrum::BANDS]
+        };
+        for (bar, t) in self.bars.iter_mut().zip(target) {
+            *bar += (t - *bar) * if t > *bar { 0.6 } else { 0.12 };
+        }
+
+        let width = (rect.width() - 48.0).clamp(180.0, 440.0);
+        ui.vertical_centered(|ui| {
+            ui.set_max_width(width);
+            ui.add_space(22.0);
+
+            // Cover
+            let side = width.min(rect.height() * 0.38).max(120.0);
+            match &self.cover {
+                Some(tex) => {
+                    ui.add(
+                        egui::Image::from_texture(tex)
+                            .fit_to_exact_size(egui::vec2(side, side))
+                            .corner_radius(14.0),
+                    );
+                }
+                None => {
+                    let (r, _) =
+                        ui.allocate_exact_size(egui::vec2(side, side), egui::Sense::hover());
+                    ui.painter().rect_filled(r, 14.0, Color32::from_gray(30));
+                    ui.painter().text(
+                        r.center(),
+                        Align2::CENTER_CENTER,
+                        "Kein Cover",
+                        egui::FontId::proportional(16.0),
+                        Color32::from_gray(110),
+                    );
+                }
+            }
+            ui.add_space(12.0);
+
+            // Titel
+            let title = if music.title.is_empty() {
+                "Unbekannter Titel"
+            } else {
+                &music.title
+            };
+            ui.label(RichText::new(title).size(24.0).strong());
+            if !music.artist.is_empty() {
+                ui.label(RichText::new(&music.artist).size(16.0).color(ACCENT));
+            }
+            if !music.album.is_empty() {
+                ui.label(RichText::new(&music.album).weak());
+            }
+            ui.add_space(10.0);
+
+            // Spektrum
+            let (area, _) = ui.allocate_exact_size(egui::vec2(width, 54.0), egui::Sense::hover());
+            let slot = area.width() / spectrum::BANDS as f32;
+            for (i, v) in self.bars.iter().enumerate() {
+                let h = (v * area.height()).max(2.0);
+                let x = area.left() + i as f32 * slot;
+                let bar = egui::Rect::from_min_max(
+                    egui::pos2(x + 1.5, area.bottom() - h),
+                    egui::pos2(x + slot - 1.5, area.bottom()),
+                );
+                let alpha = (90.0 + 165.0 * v) as u8;
+                ui.painter().rect_filled(
+                    bar,
+                    2.0,
+                    Color32::from_rgba_unmultiplied(ACCENT.r(), ACCENT.g(), ACCENT.b(), alpha),
+                );
+            }
+            ui.add_space(6.0);
+
+            // Fortschritt
+            if let Some((pos, dur)) = music.position_now(playing) {
+                let (r, _) = ui.allocate_exact_size(egui::vec2(width, 30.0), egui::Sense::hover());
+                let track =
+                    egui::Rect::from_min_size(r.min + egui::vec2(0.0, 4.0), egui::vec2(width, 5.0));
+                ui.painter().rect_filled(track, 3.0, Color32::from_gray(45));
+                let frac = if dur > 0.0 { (pos / dur) as f32 } else { 0.0 };
+                let filled = egui::Rect::from_min_size(
+                    track.min,
+                    egui::vec2(width * frac.clamp(0.0, 1.0), 5.0),
+                );
+                ui.painter().rect_filled(filled, 3.0, ACCENT);
+                let font = egui::FontId::proportional(12.0);
+                ui.painter().text(
+                    r.left_bottom(),
+                    Align2::LEFT_BOTTOM,
+                    fmt_time(pos),
+                    font.clone(),
+                    Color32::GRAY,
+                );
+                ui.painter().text(
+                    r.right_bottom(),
+                    Align2::RIGHT_BOTTOM,
+                    format!("-{}", fmt_time((dur - pos).max(0.0))),
+                    font,
+                    Color32::GRAY,
+                );
+            }
+            ui.add_space(4.0);
+
+            // Bedienung
+            let remote = music.dacp.as_ref().is_some_and(|d| d.target.is_some());
+            let mut command = None;
+            ui.horizontal(|ui| {
+                ui.add_space((width - 3.0 * 52.0 - 2.0 * 16.0).max(0.0) / 2.0);
+                if icon_button(ui, Icon::Previous, remote) {
+                    command = Some(Command::Previous);
+                }
+                let middle = if playing { Icon::Pause } else { Icon::Play };
+                if icon_button(ui, middle, remote) {
+                    command = Some(Command::PlayPause);
+                }
+                if icon_button(ui, Icon::Next, remote) {
+                    command = Some(Command::Next);
+                }
+            });
+            if let Some(cmd) = command {
+                std::thread::spawn(move || {
+                    if let Err(e) = dacp::send(cmd) {
+                        log!("[Fernsteuerung] {e:#}");
+                    }
+                });
+            }
+            if !remote {
+                ui.label(
+                    RichText::new("Bedienung nur am iPhone (Fernsteuerung nicht verfügbar)")
+                        .weak()
+                        .small(),
+                );
+            }
+
+            // Lautstärke (vom iPhone gesteuert)
+            ui.add_space(6.0);
+            let pct = volume_percent(music.volume_db);
+            ui.label(RichText::new(format!("Lautstärke {pct} %")).weak().small());
+        });
+    }
+}
+
+/// Skala wie beim iPhone: -30 dB = ganz leise (0 %), 0 dB = voll (100 %), -144 = stumm.
+fn volume_percent(db: f32) -> u32 {
+    if db <= -100.0 {
+        0
+    } else {
+        (((db + 30.0) / 30.0).clamp(0.0, 1.0) * 100.0).round() as u32
+    }
+}
+
+fn fmt_time(secs: f64) -> String {
+    let s = secs.max(0.0) as u64;
+    format!("{}:{:02}", s / 60, s % 60)
+}
+
+fn decode_cover(bytes: &[u8]) -> Option<ColorImage> {
+    let img = image::load_from_memory(bytes)
+        .ok()?
+        .thumbnail(640, 640)
+        .to_rgba8();
+    let size = [img.width() as usize, img.height() as usize];
+    Some(ColorImage::from_rgba_unmultiplied(size, img.as_raw()))
+}
+
+/// Runder Knopf mit selbst gezeichnetem Symbol (die eingebaute Schrift hat keine Medien-Symbole).
+fn icon_button(ui: &mut egui::Ui, icon: Icon, enabled: bool) -> bool {
+    let (rect, response) = ui.allocate_exact_size(
+        egui::vec2(52.0, 52.0),
+        if enabled {
+            egui::Sense::click()
+        } else {
+            egui::Sense::hover()
+        },
+    );
+    let hot = enabled && response.hovered();
+    let bg = if hot {
+        Color32::from_gray(60)
+    } else {
+        Color32::from_gray(36)
+    };
+    let fg = if enabled {
+        Color32::WHITE
+    } else {
+        Color32::from_gray(90)
+    };
+    let p = ui.painter();
+    p.circle_filled(rect.center(), 26.0, bg);
+    let c = rect.center();
+    let tri = |p: &egui::Painter, tip_x: f32, back_x: f32| {
+        p.add(egui::Shape::convex_polygon(
+            vec![
+                egui::pos2(tip_x, c.y),
+                egui::pos2(back_x, c.y - 9.0),
+                egui::pos2(back_x, c.y + 9.0),
+            ],
+            fg,
+            egui::Stroke::NONE,
+        ));
+    };
+    let bar = |p: &egui::Painter, x: f32, w: f32, h: f32| {
+        p.rect_filled(
+            egui::Rect::from_center_size(egui::pos2(x, c.y), egui::vec2(w, h)),
+            1.0,
+            fg,
+        );
+    };
+    match icon {
+        Icon::Play => tri(p, c.x + 9.0, c.x - 7.0),
+        Icon::Pause => {
+            bar(p, c.x - 5.0, 5.0, 18.0);
+            bar(p, c.x + 5.0, 5.0, 18.0);
+        }
+        Icon::Next => {
+            tri(p, c.x + 4.0, c.x - 8.0);
+            bar(p, c.x + 8.0, 3.0, 18.0);
+        }
+        Icon::Previous => {
+            tri(p, c.x - 4.0, c.x + 8.0);
+            bar(p, c.x - 8.0, 3.0, 18.0);
+        }
+    }
+    response.clicked()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn time_format() {
+        assert_eq!(fmt_time(0.0), "0:00");
+        assert_eq!(fmt_time(75.9), "1:15");
+        assert_eq!(fmt_time(-3.0), "0:00");
+    }
+
+    #[test]
+    fn volume_scale() {
+        assert_eq!(volume_percent(0.0), 100);
+        assert_eq!(volume_percent(-30.0), 0);
+        assert_eq!(volume_percent(-15.0), 50);
+        assert_eq!(volume_percent(-144.0), 0);
+    }
+
+    #[test]
+    fn bad_cover_data_is_ignored() {
+        assert!(decode_cover(b"das ist kein Bild").is_none());
+        assert!(decode_cover(&[]).is_none());
+    }
 }

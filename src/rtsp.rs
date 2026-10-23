@@ -96,11 +96,19 @@ fn handle(stream: TcpStream, identity: &Identity, mirror: &Slot) -> Result<()> {
             req.path,
             req.body.len()
         );
+        if let (Some(id), Some(remote)) =
+            (req.headers.get("dacp-id"), req.headers.get("active-remote"))
+        {
+            crate::dacp::learn(id, remote, conn.peer_ip);
+        }
         let resp = route(&req, identity, &mut conn, mirror).unwrap_or_else(|e| {
             log!("   Fehler in {}: {e:#}", req.path);
             Response::status(470, "Connection Authorization Required")
         });
         write_response(&mut writer, &req, &resp)?;
+    }
+    if conn.music {
+        crate::music::clear();
     }
     Ok(())
 }
@@ -112,6 +120,7 @@ struct Conn {
     fairplay: FairPlay,
     stream: StreamState,
     peer_ip: Option<IpAddr>,
+    music: bool, // diese Verbindung hat Musik-Infos geschickt (wird beim Ende wieder gelöscht)
 }
 
 fn route(req: &Request, id: &Identity, conn: &mut Conn, mirror: &Slot) -> Result<Response> {
@@ -140,14 +149,17 @@ fn route(req: &Request, id: &Identity, conn: &mut Conn, mirror: &Slot) -> Result
             "text/parameters",
             b"volume: 0.000000\r\n".to_vec(),
         )),
-        ("SET_PARAMETER", _) if parse_volume(&req.body).is_some() => {
-            #[cfg(feature = "audio")]
-            if let Some(db) = parse_volume(&req.body) {
-                crate::playback::set_volume_db(db);
-            }
+        // Lautstärke, Titel, Cover und Fortschritt vom iPhone (siehe music.rs)
+        ("SET_PARAMETER", _) => {
+            let content_type = req
+                .headers
+                .get("content-type")
+                .map(String::as_str)
+                .unwrap_or("");
+            conn.music |= crate::music::set_parameter(content_type, &req.body);
             Ok(Response::empty())
         }
-        ("FLUSH" | "TEARDOWN" | "GET_PARAMETER" | "SET_PARAMETER", _) => Ok(Response::empty()),
+        ("FLUSH" | "TEARDOWN" | "GET_PARAMETER", _) => Ok(Response::empty()),
         ("POST", "/feedback" | "/command") => Ok(Response::empty()),
         ("POST", "/fp-setup") => {
             let reply = match req.body.len() {
@@ -191,13 +203,6 @@ fn route(req: &Request, id: &Identity, conn: &mut Conn, mirror: &Slot) -> Result
             Ok(Response::status(501, "Not Implemented"))
         }
     }
-}
-
-/// Liest die Lautstärke aus einem SET_PARAMETER-Body ("volume: -15.000000", in dB).
-fn parse_volume(body: &[u8]) -> Option<f32> {
-    let text = std::str::from_utf8(body).ok()?;
-    let value = text.trim().strip_prefix("volume:")?;
-    value.trim().parse().ok()
 }
 
 /// Vollständige Antwort auf GET /info (wie UxPlay), inkl. Audio-Formaten und Display.
@@ -362,17 +367,4 @@ fn write_response(w: &mut TcpStream, req: &Request, resp: &Response) -> Result<(
     w.write_all(&resp.body)?;
     w.flush()?;
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn volume_parameter_is_parsed() {
-        assert_eq!(parse_volume(b"volume: -15.500000\r\n"), Some(-15.5));
-        assert_eq!(parse_volume(b"volume: 0.000000"), Some(0.0));
-        assert_eq!(parse_volume(b"progress: 1/2/3"), None);
-        assert_eq!(parse_volume(b"volume: abc"), None);
-    }
 }

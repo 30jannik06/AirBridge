@@ -30,6 +30,7 @@ ed25519-dalek = "3.0.0"
 eframe = { version = "0.37.0", default-features = false, features = ["glow", "default_fonts"] }
 fdk-aac = { version = "0.8.0", optional = true }
 getrandom = "0.4.3"
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png"] }
 mdns-sd = "0.21.6"
 plist = "1.10.3"
 serde = { version = "1.0.229", features = ["derive"] }

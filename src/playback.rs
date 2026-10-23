@@ -28,6 +28,14 @@ pub fn gain() -> f32 {
     }
 }
 
+/// Die letzten Samples (Mono) für die Spektrum-Anzeige.
+static SCOPE: Mutex<Vec<f32>> = Mutex::new(Vec::new());
+
+/// Gibt die letzten `crate::spectrum::N` Samples zurück (oder weniger, wenn noch nicht genug da sind).
+pub fn scope() -> Vec<f32> {
+    SCOPE.lock().map(|s| s.clone()).unwrap_or_default()
+}
+
 const PREFILL_MS: usize = 60; // erst abspielen, wenn so viel Ton im Puffer liegt (verhindert Knacken)
 const MAX_MS: usize = 300; // liegt mehr im Puffer, holen wir auf (verwerfen Altes), sonst wächst die Verzögerung
 const KEEP_MS: usize = 120;
@@ -170,6 +178,14 @@ impl Player {
             })
             .collect();
         let n = frames.len();
+        if let Ok(mut scope) = SCOPE.lock() {
+            scope.extend(frames.iter().map(|f| (f[0] + f[1]) / 2.0));
+            let keep = crate::spectrum::N;
+            if scope.len() > keep {
+                let excess = scope.len() - keep;
+                scope.drain(..excess);
+            }
+        }
 
         // Lineare Interpolation von src_rate auf die Geräte-Abtastrate.
         let mut rs = self.resample.lock().unwrap();
