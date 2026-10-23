@@ -5,10 +5,28 @@ use anyhow::{Result, anyhow, bail};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Error, FromSample, SampleFormat, SizedSample, StreamConfig};
 use std::collections::VecDeque;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
 use std::time::Duration;
+
+/// Lautstärke vom iPhone in dB (0 = voll, -144 = stumm), als Bits in einem Atomic, damit jeder Thread sie setzen kann.
+static VOLUME_DB_BITS: AtomicU32 = AtomicU32::new(0);
+
+/// Setzt die Lautstärke (AirPlay-Skala: 0 dB = voll, etwa -30 dB = sehr leise, -144 = stumm).
+pub fn set_volume_db(db: f32) {
+    VOLUME_DB_BITS.store(db.to_bits(), Ordering::Relaxed);
+}
+
+/// Faktor, mit dem die Samples multipliziert werden.
+pub fn gain() -> f32 {
+    let db = f32::from_bits(VOLUME_DB_BITS.load(Ordering::Relaxed));
+    if db <= -144.0 {
+        0.0
+    } else {
+        10f32.powf(db.min(0.0) / 20.0)
+    }
+}
 
 const PREFILL_MS: usize = 60; // erst abspielen, wenn so viel Ton im Puffer liegt (verhindert Knacken)
 const MAX_MS: usize = 300; // liegt mehr im Puffer, holen wir auf (verwerfen Altes), sonst wächst die Verzögerung
@@ -172,12 +190,31 @@ impl Player {
         rs.prev = frames[n - 1];
         drop(rs);
 
+        let g = gain();
         let mut s = self.shared.lock().unwrap();
-        s.queue.extend(out);
+        s.queue.extend(out.into_iter().map(|v| v * g));
         let per_ms = self.dev_rate as usize * 2 / 1000;
         if s.queue.len() > MAX_MS * per_ms {
             let excess = s.queue.len() - KEEP_MS * per_ms;
             s.queue.drain(..excess & !1); // gerade Anzahl, damit links/rechts nicht vertauscht werden
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn volume_scale() {
+        set_volume_db(0.0);
+        assert!((gain() - 1.0).abs() < 1e-6);
+        set_volume_db(-20.0);
+        assert!((gain() - 0.1).abs() < 1e-4);
+        set_volume_db(-144.0);
+        assert_eq!(gain(), 0.0);
+        set_volume_db(5.0); // über 0 dB wird nicht verstärkt
+        assert!((gain() - 1.0).abs() < 1e-6);
+        set_volume_db(0.0);
     }
 }

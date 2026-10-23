@@ -121,11 +121,14 @@ pub fn apply_settings(mut new: Settings) {
 pub fn approve(id: &str, name: &str, ip: &str) -> bool {
     with(|s| s.device = Some(name.to_string()));
     let (rx, ok) = with(|s| {
-        if !s.settings.require_confirm || s.settings.is_trusted(id) {
+        if s.settings.is_trusted(id) {
             return (None, true);
         }
-        if s.pending.is_some() {
-            return (None, false); // es wartet schon eine andere Anfrage
+        if s.settings.trusted_only || s.pending.is_some() {
+            return (None, false); // unbekannt und nur Vertraute erlaubt, oder es wartet schon eine andere Anfrage
+        }
+        if !s.settings.require_confirm {
+            return (None, true);
         }
         let (tx, rx) = mpsc::channel();
         s.pending = Some(Pending {
@@ -136,7 +139,14 @@ pub fn approve(id: &str, name: &str, ip: &str) -> bool {
         });
         (Some(rx), true)
     });
-    let Some(rx) = rx else { return ok };
+    let Some(rx) = rx else {
+        if !ok {
+            log(format!(
+                "Verbindung von {name} ({ip}) abgelehnt: nicht vertraut"
+            ));
+        }
+        return ok;
+    };
     log(format!(
         "Verbindungsanfrage von {name} ({ip}): warte auf Bestätigung"
     ));

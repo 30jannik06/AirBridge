@@ -7,7 +7,7 @@ macro_rules! log {
     ($($arg:tt)*) => { $crate::shared::log(format!($($arg)*)) };
 }
 
-#[cfg(feature = "nonfree-audio")]
+#[cfg(feature = "audio")]
 mod audio;
 mod config;
 mod decoder;
@@ -19,7 +19,7 @@ mod mirror;
 mod ntp;
 mod pairing;
 mod platform;
-#[cfg(feature = "nonfree-audio")]
+#[cfg(feature = "audio")]
 mod playback;
 mod rtsp;
 mod selftest;

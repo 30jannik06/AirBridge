@@ -461,6 +461,10 @@ impl App {
             &mut self.edit.require_confirm,
             "Neue Verbindungen bestätigen",
         );
+        ui.checkbox(
+            &mut self.edit.trusted_only,
+            "Nur vertraute Geräte (andere still ablehnen)",
+        );
         ui.label(
             RichText::new("Ohne Bestätigung kann sich jedes Gerät im selben Netzwerk verbinden.")
                 .weak()

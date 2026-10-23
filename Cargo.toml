@@ -11,14 +11,17 @@ categories = ["multimedia::video", "network-programming"]
 publish = false
 
 [features]
-# Sound (AAC-ELD via FDK-AAC + playback via cpal). OFF by default, and the prebuilt releases are built without it:
+# `audio`: playback via cpal and ALAC (AirPlay music), all permissively licensed, on by default.
+# `nonfree-audio`: adds AAC-ELD via FDK-AAC (sound while screen mirroring). OFF by default, and the prebuilt releases are built without it:
 # the FDK-AAC license is not compatible with the GPL when distributing binaries. Build it yourself for your own
 # use with `--features nonfree-audio`, and do not redistribute that binary. See THIRD_PARTY_NOTICES.md.
-default = []
-nonfree-audio = ["dep:fdk-aac", "dep:cpal", "dep:cbc"]
+default = ["audio"]
+audio = ["dep:cpal", "dep:cbc", "dep:alac"]
+nonfree-audio = ["audio", "dep:fdk-aac"]
 
 [dependencies]
 aes = "0.9.3"
+alac = { version = "0.5.0", default-features = false, optional = true }
 anyhow = "1.0.104"
 cbc = { version = "0.2.1", optional = true }
 cpal = { version = "0.18.2", optional = true }

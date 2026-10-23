@@ -45,6 +45,7 @@ name = "airbridge"
 version = "0.2.0"
 dependencies = [
  "aes",
+ "alac",
  "anyhow",
  "cbc",
  "cc",
@@ -63,6 +64,12 @@ dependencies = [
  "windows",
  "x25519-dalek",
 ]
+
+[[package]]
+name = "alac"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "498a34d3cad5f3b23cc217ab489424ebcfffed186e30ad5ac02624e50df2c2b8"
 
 [[package]]
 name = "alsa"

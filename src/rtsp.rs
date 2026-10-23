@@ -140,6 +140,13 @@ fn route(req: &Request, id: &Identity, conn: &mut Conn, mirror: &Slot) -> Result
             "text/parameters",
             b"volume: 0.000000\r\n".to_vec(),
         )),
+        ("SET_PARAMETER", _) if parse_volume(&req.body).is_some() => {
+            #[cfg(feature = "audio")]
+            if let Some(db) = parse_volume(&req.body) {
+                crate::playback::set_volume_db(db);
+            }
+            Ok(Response::empty())
+        }
         ("FLUSH" | "TEARDOWN" | "GET_PARAMETER" | "SET_PARAMETER", _) => Ok(Response::empty()),
         ("POST", "/feedback" | "/command") => Ok(Response::empty()),
         ("POST", "/fp-setup") => {
@@ -184,6 +191,13 @@ fn route(req: &Request, id: &Identity, conn: &mut Conn, mirror: &Slot) -> Result
             Ok(Response::status(501, "Not Implemented"))
         }
     }
+}
+
+/// Liest die Lautstärke aus einem SET_PARAMETER-Body ("volume: -15.000000", in dB).
+fn parse_volume(body: &[u8]) -> Option<f32> {
+    let text = std::str::from_utf8(body).ok()?;
+    let value = text.trim().strip_prefix("volume:")?;
+    value.trim().parse().ok()
 }
 
 /// Vollständige Antwort auf GET /info (wie UxPlay), inkl. Audio-Formaten und Display.
@@ -348,4 +362,17 @@ fn write_response(w: &mut TcpStream, req: &Request, resp: &Response) -> Result<(
     w.write_all(&resp.body)?;
     w.flush()?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn volume_parameter_is_parsed() {
+        assert_eq!(parse_volume(b"volume: -15.500000\r\n"), Some(-15.5));
+        assert_eq!(parse_volume(b"volume: 0.000000"), Some(0.0));
+        assert_eq!(parse_volume(b"progress: 1/2/3"), None);
+        assert_eq!(parse_volume(b"volume: abc"), None);
+    }
 }

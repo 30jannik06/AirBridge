@@ -30,6 +30,8 @@ pub struct Settings {
     pub start_fullscreen: bool,
     /// Vor jeder neuen Verbindung nachfragen.
     pub require_confirm: bool,
+    /// Unbekannte Geräte still ablehnen (ohne Dialog); nur vertraute Geräte dürfen spiegeln.
+    pub trusted_only: bool,
     pub trusted: Vec<Trusted>,
 }
 
@@ -42,6 +44,7 @@ impl Default for Settings {
             always_on_top: false,
             start_fullscreen: false,
             require_confirm: false,
+            trusted_only: false,
             trusted: Vec::new(),
         }
     }
@@ -120,6 +123,7 @@ mod tests {
         assert_eq!(s.name, "X");
         assert!(s.autostart);
         assert!(!s.require_confirm);
+        assert!(!s.trusted_only);
         assert!(s.trusted.is_empty());
     }
 
