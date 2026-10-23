@@ -38,6 +38,50 @@ pub fn message(title: &str, text: &str, error: bool) {
     };
 }
 
+const RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
+
+/// Schaltet "Mit Windows starten" ein oder aus (Eintrag im Run-Schlüssel des aktuellen Nutzers, ohne Adminrechte).
+/// Gestartet wird mit `--minimized`: AirBridge sitzt dann nur im Tray.
+pub fn set_autostart(on: bool) -> Result<()> {
+    let reg = |args: &[String]| -> Result<bool> {
+        Ok(Command::new("reg")
+            .args(args)
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()?
+            .status
+            .success())
+    };
+    let ok = if on {
+        let exe = std::env::current_exe()?;
+        reg(&[
+            "add".into(),
+            RUN_KEY.into(),
+            "/v".into(),
+            RULE_NAME.into(),
+            "/t".into(),
+            "REG_SZ".into(),
+            "/d".into(),
+            format!("\"{}\" --minimized", exe.display()),
+            "/f".into(),
+        ])?
+    } else {
+        // Fehlt der Eintrag schon, ist das auch in Ordnung.
+        let _ = reg(&[
+            "delete".into(),
+            RUN_KEY.into(),
+            "/v".into(),
+            RULE_NAME.into(),
+            "/f".into(),
+        ])?;
+        true
+    };
+    if ok {
+        Ok(())
+    } else {
+        bail!("Der Autostart-Eintrag konnte nicht geschrieben werden")
+    }
+}
+
 /// Legt die Firewall-Regel an (`install = true`) oder entfernt sie. Braucht Administratorrechte:
 /// Ohne diese startet sich das Programm selbst neu (Windows fragt dann per UAC nach der Erlaubnis).
 pub fn firewall(install: bool) -> Result<()> {

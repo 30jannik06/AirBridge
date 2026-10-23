@@ -72,7 +72,7 @@ fn open(shared: &Arc<Mutex<Shared>>) -> Result<(cpal::Stream, u32)> {
     let format = supported.sample_format();
     let config: StreamConfig = supported.into();
     let rate = config.sample_rate;
-    println!(
+    log!(
         "[Audio] Ausgabe: {} Kanäle, {rate} Hz, Format {format}",
         config.channels
     );
@@ -125,7 +125,7 @@ where
             }
         }
     };
-    let on_error = |e: Error| eprintln!("[Audio] Ausgabefehler: {e}");
+    let on_error = |e: Error| log!("[Audio] Ausgabefehler: {e}");
     device
         .build_output_stream(config, callback, on_error, None)
         .map_err(|e| anyhow!("{e}"))

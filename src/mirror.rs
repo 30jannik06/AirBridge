@@ -30,7 +30,7 @@ const START_CODE: [u8; 4] = [0, 0, 0, 1];
 /// `video` ist der Weg zum Decoder: jedes Element ist ein Bild (Annex B). Ein leeres Element = Stream zu Ende.
 pub fn spawn(slot: Slot, video: SyncSender<(Instant, Vec<u8>)>) -> Result<()> {
     let listener = TcpListener::bind(("0.0.0.0", config::MIRROR_PORT))?;
-    println!("Mirror-Kanal lauscht auf Port {}", config::MIRROR_PORT);
+    log!("Mirror-Kanal lauscht auf Port {}", config::MIRROR_PORT);
     thread::spawn(move || {
         for stream in listener.incoming() {
             let Ok(stream) = stream else { continue };
@@ -39,11 +39,11 @@ pub fn spawn(slot: Slot, video: SyncSender<(Instant, Vec<u8>)>) -> Result<()> {
             thread::spawn(move || match keys {
                 Some(keys) => {
                     if let Err(e) = handle(stream, keys, &video) {
-                        eprintln!("[Mirror] Fehler: {e:#}");
+                        log!("[Mirror] Fehler: {e:#}");
                     }
                     let _ = video.send((Instant::now(), Vec::new())); // Fenster zurücksetzen
                 }
-                None => eprintln!("[Mirror] Verbindung ohne Schlüssel, verworfen"),
+                None => log!("[Mirror] Verbindung ohne Schlüssel, verworfen"),
             });
         }
     });
@@ -55,7 +55,7 @@ fn handle(
     keys: StreamKeys,
     video: &SyncSender<(Instant, Vec<u8>)>,
 ) -> Result<()> {
-    println!("[Mirror] iPhone verbunden");
+    log!("[Mirror] iPhone verbunden");
     // EIN Cipher für die ganze Verbindung: der Keystream läuft über alle Pakete weiter.
     let mut cipher = AesCtr::new(&keys.key.into(), &keys.iv.into());
     let mut sps_pps: Vec<u8> = Vec::new();
@@ -81,14 +81,14 @@ fn handle(
                 if !to_annex_b(&mut payload) {
                     bad += 1;
                     if bad <= 3 {
-                        eprintln!(
+                        log!(
                             "[Mirror] Paket {frames}: ungültige NAL-Struktur (Entschlüsselung falsch?)"
                         );
                     }
                     continue;
                 }
                 if frames < 5 || frames % 120 == 0 {
-                    println!(
+                    log!(
                         "[Mirror] Frame {frames}: {size} Byte, NAL-Typ {}",
                         payload[4] & 0x1f
                     );
@@ -103,16 +103,16 @@ fn handle(
             }
             1 => {
                 if let Some(p) = parse_avcc(&payload) {
-                    println!("[Mirror] SPS/PPS erhalten ({} Byte)", p.len());
+                    log!("[Mirror] SPS/PPS erhalten ({} Byte)", p.len());
                     sps_pps = p;
                 } else {
-                    eprintln!("[Mirror] SPS/PPS-Paket nicht lesbar (HEVC?)");
+                    log!("[Mirror] SPS/PPS-Paket nicht lesbar (HEVC?)");
                 }
             }
             _ => {} // Heartbeat / Streaming-Report
         }
     }
-    println!("[Mirror] getrennt ({frames} Frames, {bad} fehlerhaft)");
+    log!("[Mirror] getrennt ({frames} Frames, {bad} fehlerhaft)");
     Ok(())
 }
 

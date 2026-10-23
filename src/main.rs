@@ -1,6 +1,12 @@
 // AirBridge: AirPlay-Mirroring-Receiver für Windows.
 // Phase 1: mDNS-Discovery   Phase 2: RTSP-Server + Pairing   Phase 3: FairPlay, SETUP, Mirror-Kanal
-// Phase 4: H.264-Decoder (Media Foundation) + Live-Fenster
+// Phase 4: H.264-Decoder (Media Foundation)   Phase 5: Oberfläche (egui), Einstellungen, Tray
+
+// Schreibt in die Konsole UND in die Log-Ansicht der Oberfläche. Muss vor den `mod`-Zeilen stehen.
+macro_rules! log {
+    ($($arg:tt)*) => { $crate::shared::log(format!($($arg)*)) };
+}
+
 #[cfg(feature = "nonfree-audio")]
 mod audio;
 mod config;
@@ -17,12 +23,16 @@ mod platform;
 mod playback;
 mod rtsp;
 mod selftest;
+mod settings;
+mod shared;
 mod sps;
 mod stream;
-mod window;
+mod tray;
+mod ui;
 
 use anyhow::Result; // `Result<T>` mit beliebigem Fehler; `?` reicht Fehler nach oben weiter
-use std::sync::mpsc::{SyncSender, sync_channel};
+use shared::NetCmd;
+use std::sync::mpsc::{Receiver, SyncSender, channel, sync_channel};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Instant;
@@ -65,20 +75,22 @@ fn main() -> Result<()> {
         }
         _ => {}
     }
+    // `--minimized` (Autostart): nur im Tray starten, aber nur wenn es das Tray-Verhalten auch gibt.
+    let start_hidden =
+        args.iter().any(|a| a == "--minimized") && shared::settings().minimize_to_tray;
 
     // Das Fenster MUSS im Haupt-Thread laufen. Netzwerk und Decoder laufen in eigenen Threads.
-    let (event_loop, proxy) = window::create()?;
     let latest: decoder::Latest = Arc::new(Mutex::new(None));
 
     // Kanal Netzwerk -> Decoder: bis zu 120 Bilder dürfen warten.
     let (video_tx, video_rx) = sync_channel::<(Instant, Vec<u8>)>(120);
-    decoder::spawn(video_rx, Arc::clone(&latest), move || {
-        let _ = proxy.send_event(()); // weckt das Fenster auf
-    });
+    decoder::spawn(video_rx, Arc::clone(&latest), shared::wake);
 
+    let (cmd_tx, cmd_rx) = channel::<NetCmd>();
+    shared::set_net(cmd_tx);
     thread::spawn(move || {
-        if let Err(e) = run_network(video_tx) {
-            eprintln!("Netzwerk-Fehler: {e:#}");
+        if let Err(e) = run_network(video_tx, cmd_rx) {
+            log!("Netzwerk-Fehler: {e:#}");
             platform::message(
                 "AirBridge – Netzwerkfehler",
                 &format!(
@@ -90,15 +102,22 @@ fn main() -> Result<()> {
         }
     });
 
-    window::run(event_loop, latest)
+    if let Err(e) = ui::run(latest, start_hidden) {
+        platform::message("AirBridge – Fenster", &format!("{e}"), true);
+    }
+    Ok(())
 }
 
-fn run_network(video: SyncSender<(Instant, Vec<u8>)>) -> Result<()> {
+fn run_network(video: SyncSender<(Instant, Vec<u8>)>, commands: Receiver<NetCmd>) -> Result<()> {
     let identity = Arc::new(identity::Identity::load_or_create(&identity::key_path())?);
 
     // Muss in einer Variable leben bleiben: wird sie gedroppt (Ownership!), endet die Ankündigung.
-    let _daemon = discovery::announce(&identity)?;
-    println!(
+    let mut daemon = discovery::announce(&identity, &shared::settings().name)?;
+    shared::with(|s| {
+        s.device_id = identity.device_id();
+        s.ip = shared::local_ip();
+    });
+    log!(
         "AirBridge sichtbar im Netzwerk (Geräte-ID {}).",
         identity.device_id()
     );
@@ -107,5 +126,24 @@ fn run_network(video: SyncSender<(Instant, Vec<u8>)>) -> Result<()> {
     let slot: mirror::Slot = Arc::new(Mutex::new(None));
     mirror::spawn(Arc::clone(&slot), video)?;
 
-    rtsp::serve(identity, slot) // blockiert für immer
+    // Der RTSP-Server blockiert für immer, darum bekommt er einen eigenen Thread.
+    let rtsp_identity = Arc::clone(&identity);
+    thread::spawn(move || {
+        if let Err(e) = rtsp::serve(rtsp_identity, slot) {
+            platform::message("AirBridge – Netzwerkfehler", &format!("{e:#}"), true);
+            std::process::exit(1);
+        }
+    });
+
+    // Dieser Thread wartet auf Befehle der Oberfläche (z. B. neuer Gerätename).
+    for cmd in commands {
+        match cmd {
+            NetCmd::Rename(name) => {
+                let _ = daemon.shutdown();
+                daemon = discovery::announce(&identity, &name)?;
+                log!("Neuer Name im Netzwerk: {name}");
+            }
+        }
+    }
+    Ok(())
 }

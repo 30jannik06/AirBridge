@@ -67,6 +67,20 @@ pub fn setup(
         dict.get("ekey").and_then(|v| v.as_data()),
         dict.get("eiv").and_then(|v| v.as_data()),
     ) {
+        // Sicherheit: erst fragen (falls eingestellt), dann Schlüssel entschlüsseln.
+        let text = |key: &str| {
+            dict.get(key)
+                .and_then(|v| v.as_string())
+                .map(str::to_string)
+        };
+        let ip = peer_ip.map(|i| i.to_string()).unwrap_or_default();
+        let device_name = text("name").unwrap_or_else(|| format!("iPhone ({ip})"));
+        let device_id = text("deviceID")
+            .or_else(|| text("macAddress"))
+            .unwrap_or_else(|| ip.clone());
+        if !crate::shared::approve(&device_id, &device_name, &ip) {
+            bail!("Verbindung von {device_name} wurde abgelehnt");
+        }
         let fp_key = fp.decrypt_key(ekey)?;
         // Mit Legacy-Pairing wird der FairPlay-Schlüssel noch mit dem ECDH-Geheimnis gehasht.
         let key: [u8; 16] = match ecdh_secret {
@@ -89,12 +103,12 @@ pub fn setup(
                 SocketAddr::new(ip, rport as u16),
                 Arc::clone(&st.stop),
             );
-            println!("   NTP-Anfragen an {ip}:{rport}");
+            log!("   NTP-Anfragen an {ip}:{rport}");
         }
         st._sockets.push(socket);
         res.insert("timingPort".into(), num(timing as u64));
         res.insert("eventPort".into(), num(0));
-        println!("   SETUP 1: Schlüssel entschlüsselt, timingPort {timing}");
+        log!("   SETUP 1: Schlüssel entschlüsselt, timingPort {timing}");
     }
 
     // --- SETUP 2: Streams ---
@@ -129,7 +143,7 @@ pub fn setup(
                     });
                     entry.insert("dataPort".into(), num(config::MIRROR_PORT as u64));
                     entry.insert("type".into(), num(110));
-                    println!(
+                    log!(
                         "   SETUP 2: Video-Stream (ID {id}) -> Port {}",
                         config::MIRROR_PORT
                     );
@@ -142,7 +156,7 @@ pub fn setup(
 
                     #[cfg(feature = "nonfree-audio")]
                     {
-                        println!("   Audio-Anfrage vom iPhone: {d:?}");
+                        log!("   Audio-Anfrage vom iPhone: {d:?}");
                         let get = |name: &str| {
                             d.get(name)
                                 .and_then(|v| v.as_unsigned_integer())
@@ -163,7 +177,7 @@ pub fn setup(
                     // halten die Sockets offen und werfen die Audiopakete einfach weg: Bild ohne Ton.
                     #[cfg(not(feature = "nonfree-audio"))]
                     {
-                        println!(
+                        log!(
                             "   Audio-Stream angefragt, aber dieses Programm wurde ohne Ton gebaut."
                         );
                         st._sockets.push(data);
@@ -172,7 +186,7 @@ pub fn setup(
                     entry.insert("dataPort".into(), num(data_port as u64));
                     entry.insert("controlPort".into(), num(control_port as u64));
                     entry.insert("type".into(), num(96));
-                    println!("   SETUP 2: Audio-Stream, Ports {data_port}/{control_port}");
+                    log!("   SETUP 2: Audio-Stream, Ports {data_port}/{control_port}");
                 }
                 other => bail!("unbekannter Stream-Typ {other}"),
             }

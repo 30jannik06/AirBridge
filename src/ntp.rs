@@ -39,7 +39,7 @@ pub fn start(socket: UdpSocket, remote: SocketAddr, stop: Arc<AtomicBool>) {
                 if n >= 32 {
                     replies += 1;
                     if replies == 1 {
-                        println!("   NTP: erste Antwort vom iPhone nach {sent} Anfrage(n)");
+                        log!("   NTP: erste Antwort vom iPhone nach {sent} Anfrage(n)");
                     }
                 }
             }

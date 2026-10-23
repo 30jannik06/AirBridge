@@ -25,7 +25,7 @@ pub fn spawn(rx: Receiver<(Instant, Vec<u8>)>, latest: Latest, wake: impl Fn() +
     thread::spawn(move || {
         let mut decoder = match H264Decoder::new() {
             Ok(d) => d,
-            Err(e) => return eprintln!("[Decoder] Start fehlgeschlagen: {e:#}"),
+            Err(e) => return log!("[Decoder] Start fehlgeschlagen: {e:#}"),
         };
         let mut errors = 0u32;
         // Messwerte: wie lange dauert es von "Paket angekommen" bis "Bild fertig dekodiert"?
@@ -38,7 +38,7 @@ pub fn spawn(rx: Receiver<(Instant, Vec<u8>)>, latest: Latest, wake: impl Fn() +
                 // Für den nächsten Stream mit frischem Zustand starten.
                 match H264Decoder::new() {
                     Ok(d) => decoder = d,
-                    Err(e) => return eprintln!("[Decoder] Neustart fehlgeschlagen: {e:#}"),
+                    Err(e) => return log!("[Decoder] Neustart fehlgeschlagen: {e:#}"),
                 }
                 continue;
             }
@@ -51,10 +51,13 @@ pub fn spawn(rx: Receiver<(Instant, Vec<u8>)>, latest: Latest, wake: impl Fn() +
                         wake();
                         let ms = arrived.elapsed().as_secs_f64() * 1000.0;
                         sum_ms += ms;
+                        crate::shared::with(|s| {
+                            s.latency_ms = s.latency_ms * 0.95 + ms as f32 * 0.05
+                        });
                         max_ms = max_ms.max(ms);
                     }
                     if n_in % 300 == 0 {
-                        println!(
+                        log!(
                             "[Decoder] Latenz Ankunft->Bild: Ø {:.1} ms, max {:.1} ms; im Decoder zurückgehalten: {}",
                             sum_ms / 300.0,
                             max_ms,
@@ -66,7 +69,7 @@ pub fn spawn(rx: Receiver<(Instant, Vec<u8>)>, latest: Latest, wake: impl Fn() +
                 Err(e) => {
                     errors += 1;
                     if errors <= 5 {
-                        eprintln!("[Decoder] Fehler: {e:#}");
+                        log!("[Decoder] Fehler: {e:#}");
                     }
                 }
             }
@@ -109,8 +112,8 @@ impl H264Decoder {
                 .GetAttributes()
                 .and_then(|a| a.SetUINT32(&MF_LOW_LATENCY, 1))
             {
-                Ok(()) => println!("[Decoder] Low-Latency-Modus aktiv"),
-                Err(e) => println!("[Decoder] Low-Latency-Modus nicht verfügbar: {e}"),
+                Ok(()) => log!("[Decoder] Low-Latency-Modus aktiv"),
+                Err(e) => log!("[Decoder] Low-Latency-Modus nicht verfügbar: {e}"),
             }
 
             let input = MFCreateMediaType()?;
@@ -189,7 +192,7 @@ impl H264Decoder {
             self.stride = stride;
             self.disp_w = dw;
             self.disp_h = dh;
-            println!("[Decoder] Ausgabeformat NV12 {w}x{h} (sichtbar {dw}x{dh}), Stride {stride}");
+            log!("[Decoder] Ausgabeformat NV12 {w}x{h} (sichtbar {dw}x{dh}), Stride {stride}");
         }
         Ok(())
     }

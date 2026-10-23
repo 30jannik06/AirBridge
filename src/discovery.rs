@@ -4,7 +4,7 @@ use anyhow::Result;
 use mdns_sd::{ServiceDaemon, ServiceInfo};
 
 // `&str` = geliehener Text (nur lesen), `String` = besitzt seinen Text.
-pub fn announce(id: &Identity) -> Result<ServiceDaemon> {
+pub fn announce(id: &Identity, name: &str) -> Result<ServiceDaemon> {
     let daemon = ServiceDaemon::new()?; // `?` = bei Fehler sofort zurückgeben
     let host = "airbridge.local.";
     let pk = hex(&id.public());
@@ -25,7 +25,7 @@ pub fn announce(id: &Identity) -> Result<ServiceDaemon> {
     // IP leer + enable_addr_auto(): die Library trägt alle lokalen IPs selbst ein.
     let airplay = ServiceInfo::new(
         "_airplay._tcp.local.",
-        NAME,
+        name,
         host,
         "",
         RTSP_PORT,
@@ -35,7 +35,7 @@ pub fn announce(id: &Identity) -> Result<ServiceDaemon> {
     daemon.register(airplay)?;
 
     // --- _raop._tcp --- Instanzname MUSS "<MAC ohne Doppelpunkte>@<Name>" sein.
-    let raop_name = format!("{}@{}", device_id.replace(':', ""), NAME);
+    let raop_name = format!("{}@{}", device_id.replace(':', ""), name);
     let raop_txt = [
         ("txtvers", "1"),
         ("ch", "2"),

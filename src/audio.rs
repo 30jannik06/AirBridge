@@ -47,7 +47,7 @@ pub fn start(
     params: AudioParams,
     stop: Arc<AtomicBool>,
 ) {
-    println!(
+    log!(
         "[Audio] Format vom iPhone: Codec {} ({}), {} Samples/Frame, Maske {:#x}",
         params.ct,
         if params.ct == CODEC_AAC_ELD {
@@ -70,19 +70,19 @@ pub fn start(
     });
 
     if params.ct != CODEC_AAC_ELD {
-        println!("[Audio] Dieser Codec wird nicht unterstützt, es gibt keinen Ton.");
+        log!("[Audio] Dieser Codec wird nicht unterstützt, es gibt keinen Ton.");
         return;
     }
 
     thread::spawn(move || {
         let mut decoder = Decoder::new(Transport::Raw);
         if let Err(e) = decoder.config_raw(&ELD_44100_STEREO) {
-            return eprintln!("[Audio] AAC-ELD-Decoder konnte nicht gestartet werden: {e}");
+            return log!("[Audio] AAC-ELD-Decoder konnte nicht gestartet werden: {e}");
         }
         let player = match playback::start(Arc::clone(&stop)) {
             Ok(p) => Some(p),
             Err(e) => {
-                eprintln!("[Audio] Kein Ton möglich: {e:#}");
+                log!("[Audio] Kein Ton möglich: {e:#}");
                 None
             }
         };
@@ -126,7 +126,7 @@ pub fn start(
                     let (channels, rate) = (info.numChannels as usize, info.sampleRate as u32);
                     let samples = decoder.decoded_frame_size();
                     if played == 0 {
-                        println!(
+                        log!(
                             "[Audio] Erstes Audio dekodiert: {channels} Kanäle, {rate} Hz, {samples} Werte/Frame"
                         );
                     }
@@ -138,11 +138,11 @@ pub fn start(
                 Err(e) => {
                     errors += 1;
                     if errors <= 5 {
-                        eprintln!("[Audio] Dekodierfehler: {e}");
+                        log!("[Audio] Dekodierfehler: {e}");
                     }
                 }
             }
         }
-        println!("[Audio] beendet: {played} Pakete gespielt, {dropped} Duplikate, {errors} Fehler");
+        log!("[Audio] beendet: {played} Pakete gespielt, {dropped} Duplikate, {errors} Fehler");
     });
 }

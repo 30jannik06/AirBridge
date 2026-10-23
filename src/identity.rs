@@ -61,7 +61,7 @@ impl Identity {
                     fs::create_dir_all(parent)?;
                 }
                 fs::write(path, seed)?;
-                println!("Neuer Schlüssel erzeugt: {}", path.display());
+                log!("Neuer Schlüssel erzeugt: {}", path.display());
                 seed
             }
         };

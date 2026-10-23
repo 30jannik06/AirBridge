@@ -59,7 +59,7 @@ impl Response {
 
 pub fn serve(identity: Arc<Identity>, mirror: Slot) -> Result<()> {
     let listener = TcpListener::bind(("0.0.0.0", config::RTSP_PORT))?;
-    println!("RTSP lauscht auf Port {}", config::RTSP_PORT);
+    log!("RTSP lauscht auf Port {}", config::RTSP_PORT);
     for stream in listener.incoming() {
         let stream = stream?;
         // Arc = geteilter Besitz: jeder Thread bekommt einen eigenen "Zeiger" auf dieselbe Identity.
@@ -71,11 +71,11 @@ pub fn serve(identity: Arc<Identity>, mirror: Slot) -> Result<()> {
                 .peer_addr()
                 .map(|a| a.to_string())
                 .unwrap_or_default();
-            println!("[{peer}] verbunden");
+            log!("[{peer}] verbunden");
             if let Err(e) = handle(stream, &identity, &mirror) {
-                eprintln!("[{peer}] Fehler: {e:#}");
+                log!("[{peer}] Fehler: {e:#}");
             }
-            println!("[{peer}] getrennt");
+            log!("[{peer}] getrennt");
         });
     }
     Ok(())
@@ -90,14 +90,14 @@ fn handle(stream: TcpStream, identity: &Identity, mirror: &Slot) -> Result<()> {
     };
 
     while let Some(req) = read_request(&mut reader)? {
-        println!(
+        log!(
             "-> {} {} (Body {} Byte)",
             req.method,
             req.path,
             req.body.len()
         );
         let resp = route(&req, identity, &mut conn, mirror).unwrap_or_else(|e| {
-            eprintln!("   Fehler in {}: {e:#}", req.path);
+            log!("   Fehler in {}: {e:#}", req.path);
             Response::status(470, "Connection Authorization Required")
         });
         write_response(&mut writer, &req, &resp)?;
@@ -174,13 +174,13 @@ fn route(req: &Request, id: &Identity, conn: &mut Conn, mirror: &Slot) -> Result
                     .as_mut()
                     .ok_or_else(|| anyhow!("Schritt 2 ohne Schritt 1"))?;
                 pairing::verify_step2(session, &req.body)?;
-                println!("   Pairing erfolgreich!");
+                log!("   Pairing erfolgreich!");
                 Ok(Response::ok("application/octet-stream", Vec::new()))
             }
             _ => Err(anyhow!("leerer pair-verify Body")),
         },
         _ => {
-            println!("   (noch nicht implementiert)");
+            log!("   (noch nicht implementiert)");
             Ok(Response::status(501, "Not Implemented"))
         }
     }
@@ -231,7 +231,7 @@ fn info_plist_full(id: &Identity) -> Result<Vec<u8>> {
         ("macAddress", s(&id.device_id())),
         ("pk", Value::Data(id.public().to_vec())),
         ("features", n(config::FEATURES)),
-        ("name", s(config::NAME)),
+        ("name", s(&crate::shared::settings().name)),
         ("pi", s(&id.pi())),
         ("vv", n(2)),
         ("statusFlags", n(68)),
@@ -270,7 +270,7 @@ fn info_plist(id: &Identity) -> Result<Vec<u8>> {
     let mut d = Dictionary::new();
     d.insert("deviceID".into(), s(&id.device_id()));
     d.insert("macAddress".into(), s(&id.device_id()));
-    d.insert("name".into(), s(config::NAME));
+    d.insert("name".into(), s(&crate::shared::settings().name));
     d.insert("model".into(), s(config::MODEL));
     d.insert("sourceVersion".into(), s(config::SRCVERS));
     d.insert("features".into(), n(config::FEATURES));
